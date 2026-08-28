@@ -62,7 +62,8 @@ pac base base-devel linux-aarch64 \
 # ---------------------------------------------------------------- localization
 log "timezone, locales, keyboard, hostname"
 ln -sf "/usr/share/zoneinfo/$VM_TIMEZONE" /etc/localtime
-sed -i "s/^#\(${VM_LOCALE} \)/\1/; s/^#\(${VM_LOCALE_EXTRA} \)/\1/" /etc/locale.gen
+sed -i "s/^#\(${VM_LOCALE} \)/\1/" /etc/locale.gen
+[ -n "$VM_LOCALE_EXTRA" ] && sed -i "s/^#\(${VM_LOCALE_EXTRA} \)/\1/" /etc/locale.gen
 grep -q "^${VM_LOCALE} " /etc/locale.gen || echo "${VM_LOCALE} UTF-8" >> /etc/locale.gen
 locale-gen
 echo "LANG=$VM_LOCALE" > /etc/locale.conf

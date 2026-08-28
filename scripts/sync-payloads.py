@@ -12,7 +12,7 @@ MAP={
  "__PAYLOAD_PROVISION_CLIPBRD_SH__":"provision/src/omarchy-arm-clipboard",
  "__PAYLOAD_PROVISION_VDAGENT_PY__":"provision/src/omarchy-arm-vdagent",
  "__PAYLOAD_PROVISION_SHARE_SH__":"provision/src/omarchy-arm-share",
- "__PAYLOAD_LEEME_MD__":"provision/src/README.md",
+ "__PAYLOAD_PROVISION_README_MD__":"provision/src/README.md",
  "__PAYLOAD_PROVISION_ARMSYNC_SH__":"provision/src/hooks/10-arm-sync",
  "__PAYLOAD_SCRIPTS_BUILD_EXP__":"scripts/build.exp",
  "__PAYLOAD_SCRIPTS_REPAIR_EXP__":"scripts/repair.exp",

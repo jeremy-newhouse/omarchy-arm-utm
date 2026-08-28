@@ -419,7 +419,7 @@ if ! command -v ttfx >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1; then
   rm -rf /tmp/ttfx-src /tmp/cargo-ttfx
 fi
 
-# --- keyboard: es layout and a usable Super key from macOS -------------------
+# --- keyboard: configured layout and a usable Super key from macOS -----------
 # macOS intercepts Cmd before UTM ever sees it (Cmd+Space opens Spotlight), so
 # Omarchy's SUPER shortcuts would be unreachable. altwin:swap_lalt_lwin
 # swaps Alt and Super: the Mac's Option (⌥) key acts as SUPER.

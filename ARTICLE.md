@@ -348,7 +348,7 @@ guest with one line:
 -- ~/.config/hypr/input.lua
 hl.config({
   input = {
-    kb_layout  = "es",
+    kb_layout  = "us",
     kb_options = "compose:caps,shift:both_capslock_cancel,altwin:swap_lalt_lwin",
   },
 })
@@ -358,8 +358,8 @@ hl.config({
 acts as SUPER, and macOS doesn't intercept Option+Space.
 
 Along the way, another detail: Hyprland reads the keyboard layout from
-`XKBLAYOUT` in `/etc/vconsole.conf`, not from `KEYMAP`. Setting only
-`KEYMAP=es` leaves Hyprland on `us`. Both need to be set.
+`XKBLAYOUT` in `/etc/vconsole.conf`, not from `KEYMAP`. Set only `KEYMAP` and
+`XKBLAYOUT` silently stays on its own default. Both need to be set.
 
 ### 4 · Windows that open invisible
 

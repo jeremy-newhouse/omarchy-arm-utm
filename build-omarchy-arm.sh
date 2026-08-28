@@ -61,7 +61,7 @@ from_env() { case " $SET_FROM_ENV " in *" $1 "*) return 0 ;; *) return 1 ;; esac
 : "${VM_KEYMAP:=us}"                     # text console
 : "${VM_XKB:=us}"                        # Hyprland/Wayland
 : "${VM_LOCALE:=en_US.UTF-8}"
-: "${VM_LOCALE_EXTRA:=es_ES.UTF-8}"
+: "${VM_LOCALE_EXTRA:=}"
 : "${DISK_SIZE:=80G}"
 : "${BUILD_SMP:=8}"                      # vCPUs during the build
 : "${BUILD_MEM:=8192}"                   # MiB during the build
@@ -171,7 +171,6 @@ detect_from_host() {
          | sed -n 's/.*"KeyboardLayout Name" = "\([^"]*\)".*/\1/p' | head -1)
     local km="" xk=""
     case "$kb" in
-      Spanish*)  km=es; xk=es ;;
       U.S.*|ABC*|US*) km=us; xk=us ;;
       British*)  km=uk; xk=gb ;;
       German*)   km=de; xk=de ;;
@@ -561,7 +560,8 @@ pac base base-devel linux-aarch64 \
 # ---------------------------------------------------------------- localization
 log "timezone, locales, keyboard, hostname"
 ln -sf "/usr/share/zoneinfo/$VM_TIMEZONE" /etc/localtime
-sed -i "s/^#\(${VM_LOCALE} \)/\1/; s/^#\(${VM_LOCALE_EXTRA} \)/\1/" /etc/locale.gen
+sed -i "s/^#\(${VM_LOCALE} \)/\1/" /etc/locale.gen
+[ -n "$VM_LOCALE_EXTRA" ] && sed -i "s/^#\(${VM_LOCALE_EXTRA} \)/\1/" /etc/locale.gen
 grep -q "^${VM_LOCALE} " /etc/locale.gen || echo "${VM_LOCALE} UTF-8" >> /etc/locale.gen
 locale-gen
 echo "LANG=$VM_LOCALE" > /etc/locale.conf
@@ -1288,7 +1288,7 @@ if ! command -v ttfx >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1; then
   rm -rf /tmp/ttfx-src /tmp/cargo-ttfx
 fi
 
-# --- keyboard: es layout and a usable Super key from macOS -------------------
+# --- keyboard: configured layout and a usable Super key from macOS -----------
 # macOS intercepts Cmd before UTM ever sees it (Cmd+Space opens Spotlight), so
 # Omarchy's SUPER shortcuts would be unreachable. altwin:swap_lalt_lwin
 # swaps Alt and Super: the Mac's Option (⌥) key acts as SUPER.
@@ -1577,11 +1577,11 @@ if [ -L /usr/share/omarchy ]; then
     || roll_back "couldn't copy $TARGET to /usr/share/omarchy"
   chown -R root:root /usr/share/omarchy
   N_ORIG=$(find "$TARGET" -mindepth 1 | wc -l)
-  N_COPIA=$(find /usr/share/omarchy -mindepth 1 | wc -l)
-  [ "$N_COPIA" -ge "$N_ORIG" ] \
-    || roll_back "the copy is incomplete ($N_COPIA of $N_ORIG entries)"
+  N_COPY=$(find /usr/share/omarchy -mindepth 1 | wc -l)
+  [ "$N_COPY" -ge "$N_ORIG" ] \
+    || roll_back "the copy is incomplete ($N_COPY of $N_ORIG entries)"
   rm -rf "$TARGET"
-  echo "  /usr/share/omarchy is now a real directory ($(du -sh /usr/share/omarchy | cut -f1), $N_COPIA entries)"
+  echo "  /usr/share/omarchy is now a real directory ($(du -sh /usr/share/omarchy | cut -f1), $N_COPY entries)"
 fi
 
 log "2/10 renaming user $OLD -> $NEW"
@@ -1924,8 +1924,8 @@ fi
 N_CMD=$(find /usr/bin -maxdepth 1 -name 'omarchy-*' | wc -l)
 [ "$N_CMD" -ge 400 ] && pass_check "$N_CMD omarchy-* commands" || fail_check "only $N_CMD omarchy-* commands (expected >=400)"
 
-N_ROTO=$(find /usr/bin /usr/local/bin /home/"$NEW" -xdev -xtype l 2>/dev/null | wc -l)
-[ "$N_ROTO" -le 5 ] && pass_check "$N_ROTO dangling symlinks" || fail_check "$N_ROTO dangling symlinks"
+N_BROKEN=$(find /usr/bin /usr/local/bin /home/"$NEW" -xdev -xtype l 2>/dev/null | wc -l)
+[ "$N_BROKEN" -le 5 ] && pass_check "$N_BROKEN dangling symlinks" || fail_check "$N_BROKEN dangling symlinks"
 
 # File names, not just contents: the sweep above uses grep -rl, which looks
 # inside files. A file that CARRIES the builder's name in its own path (mise
@@ -1937,15 +1937,15 @@ if [ "$OLD" != "$NEW" ]; then
   # user's name is chosen via the environment, so the pattern has to require
   # that $OLD appear delimited by something non-alphanumeric.
   RX_OLD=".*/([^/]*[^[:alnum:]])?$OLD([^[:alnum:]][^/]*)?"
-  mapfile -t PORNOMBRE < <(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
+  mapfile -t BY_NAME < <(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
       -regextype posix-extended -regex "$RX_OLD" 2>/dev/null)
-  if [ "${#PORNOMBRE[@]}" -gt 0 ] && [ -n "${PORNOMBRE[0]:-}" ]; then
-    echo "  removing ${#PORNOMBRE[@]} file(s) whose NAME carries '$OLD':"
-    for f in "${PORNOMBRE[@]}"; do echo "    $f"; rm -rf "$f"; done
+  if [ "${#BY_NAME[@]}" -gt 0 ] && [ -n "${BY_NAME[0]:-}" ]; then
+    echo "  removing ${#BY_NAME[@]} file(s) whose NAME carries '$OLD':"
+    for f in "${BY_NAME[@]}"; do echo "    $f"; rm -rf "$f"; done
   fi
-  RESTAN=$(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
+  REMAINING=$(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
       -regextype posix-extended -regex "$RX_OLD" 2>/dev/null | wc -l)
-  [ "$RESTAN" -eq 0 ] && pass_check "no file name mentions $OLD" || fail_check "$RESTAN names still mention $OLD"
+  [ "$REMAINING" -eq 0 ] && pass_check "no file name mentions $OLD" || fail_check "$REMAINING names still mention $OLD"
 fi
 
 # The clipboard: the five pieces that can break it.
@@ -1971,13 +1971,13 @@ if [ "$OLD" != "$NEW" ]; then
   if ! command -v strings >/dev/null 2>&1; then
     echo "  ? /usr/local/bin binaries: can't check without 'strings'"
   else
-    SUCIOS=""
+    DIRTY=""
     for b in /usr/local/bin/*; do
       [ -f "$b" ] || continue
-      strings "$b" 2>/dev/null | grep -q "/home/$OLD" && SUCIOS="$SUCIOS $b"
+      strings "$b" 2>/dev/null | grep -q "/home/$OLD" && DIRTY="$DIRTY $b"
     done
-    [ -z "$SUCIOS" ] && pass_check "no /usr/local/bin binary mentions the builder" \
-                     || fail_check "binaries with the builder's path inside:$SUCIOS (see RUSTFLAGS/CARGO_HOME in stage3)"
+    [ -z "$DIRTY" ] && pass_check "no /usr/local/bin binary mentions the builder" \
+                     || fail_check "binaries with the builder's path inside:$DIRTY (see RUSTFLAGS/CARGO_HOME in stage3)"
   fi
 fi
 [ -f /root/failed-packages.txt ] && fail_check "/root/failed-packages.txt remains" \
@@ -3503,7 +3503,7 @@ write_readme() {
   # the script's copy fell behind and shipped inside the zip claiming false
   # things -- 432 commands when there were 439, "the zip is 7 GB" when it was
   # 3.6 -- and even carried an internal note meant only for the maintainer.
-  cat > "$1" <<'__PAYLOAD_LEEME_MD__'
+  cat > "$1" <<'__PAYLOAD_PROVISION_README_MD__'
 # Omarchy on Arch Linux ARM — UTM image for Apple Silicon
 
 Image built with
@@ -3658,7 +3658,7 @@ virtio-gpu.
 Unofficial image, unaffiliated with Basecamp or the Omarchy project.
 Omarchy only supports x86_64; this is an equivalent rebuild on
 Arch Linux ARM.
-__PAYLOAD_LEEME_MD__
+__PAYLOAD_PROVISION_README_MD__
 }
 
 # ──────────────────────────────────── questions ────────────────────────────

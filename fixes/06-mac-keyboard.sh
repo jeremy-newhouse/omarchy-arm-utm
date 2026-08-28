@@ -15,12 +15,12 @@ export PATH=/usr/local/bin:$PATH
 
 log "XKBLAYOUT in /etc/vconsole.conf"
 sudo tee /etc/vconsole.conf >/dev/null <<'EOF'
-KEYMAP=es
-XKBLAYOUT=es
+KEYMAP=us
+XKBLAYOUT=us
 EOF
 cat /etc/vconsole.conf
 
-log "input.lua: es layout + Option as SUPER"
+log "input.lua: us layout + Option as SUPER"
 cat > ~/.config/hypr/input.lua <<'LUA'
 -- Keyboard settings for this VM on macOS.
 --
@@ -36,7 +36,7 @@ cat > ~/.config/hypr/input.lua <<'LUA'
 -- Monitoring permissions for UTM in System Settings > Privacy).
 hl.config({
   input = {
-    kb_layout  = "es",
+    kb_layout  = "us",
     kb_options = "compose:caps,shift:both_capslock_cancel,altwin:swap_lalt_lwin",
   },
 })

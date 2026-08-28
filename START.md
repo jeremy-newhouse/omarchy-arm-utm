@@ -72,8 +72,8 @@ with what it detects from your Mac**, so you can just hit Enter:
 ```
 ━━━ configuration ━━━
   Timezone [Europe/Madrid]:                ← from /etc/localtime
-  Keyboard (console) [es]:                 ← from macOS preferences
-  Keyboard (Hyprland/Wayland) [es]:
+  Keyboard (console) [us]:                 ← from macOS preferences
+  Keyboard (Hyprland/Wayland) [us]:
   Cores for the VM [6]:                    ← half your performance cores
   Memory for the VM (MiB) [12288]:         ← based on your RAM
   Disk size [80G]:

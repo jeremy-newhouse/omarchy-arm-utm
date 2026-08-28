@@ -41,11 +41,11 @@ if [ -L /usr/share/omarchy ]; then
     || roll_back "couldn't copy $TARGET to /usr/share/omarchy"
   chown -R root:root /usr/share/omarchy
   N_ORIG=$(find "$TARGET" -mindepth 1 | wc -l)
-  N_COPIA=$(find /usr/share/omarchy -mindepth 1 | wc -l)
-  [ "$N_COPIA" -ge "$N_ORIG" ] \
-    || roll_back "the copy is incomplete ($N_COPIA of $N_ORIG entries)"
+  N_COPY=$(find /usr/share/omarchy -mindepth 1 | wc -l)
+  [ "$N_COPY" -ge "$N_ORIG" ] \
+    || roll_back "the copy is incomplete ($N_COPY of $N_ORIG entries)"
   rm -rf "$TARGET"
-  echo "  /usr/share/omarchy is now a real directory ($(du -sh /usr/share/omarchy | cut -f1), $N_COPIA entries)"
+  echo "  /usr/share/omarchy is now a real directory ($(du -sh /usr/share/omarchy | cut -f1), $N_COPY entries)"
 fi
 
 log "2/10 renaming user $OLD -> $NEW"
@@ -388,8 +388,8 @@ fi
 N_CMD=$(find /usr/bin -maxdepth 1 -name 'omarchy-*' | wc -l)
 [ "$N_CMD" -ge 400 ] && pass_check "$N_CMD omarchy-* commands" || fail_check "only $N_CMD omarchy-* commands (expected >=400)"
 
-N_ROTO=$(find /usr/bin /usr/local/bin /home/"$NEW" -xdev -xtype l 2>/dev/null | wc -l)
-[ "$N_ROTO" -le 5 ] && pass_check "$N_ROTO dangling symlinks" || fail_check "$N_ROTO dangling symlinks"
+N_BROKEN=$(find /usr/bin /usr/local/bin /home/"$NEW" -xdev -xtype l 2>/dev/null | wc -l)
+[ "$N_BROKEN" -le 5 ] && pass_check "$N_BROKEN dangling symlinks" || fail_check "$N_BROKEN dangling symlinks"
 
 # File names, not just contents: the sweep above uses grep -rl, which looks
 # inside files. A file that CARRIES the builder's name in its own path (mise
@@ -401,15 +401,15 @@ if [ "$OLD" != "$NEW" ]; then
   # user's name is chosen via the environment, so the pattern has to require
   # that $OLD appear delimited by something non-alphanumeric.
   RX_OLD=".*/([^/]*[^[:alnum:]])?$OLD([^[:alnum:]][^/]*)?"
-  mapfile -t PORNOMBRE < <(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
+  mapfile -t BY_NAME < <(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
       -regextype posix-extended -regex "$RX_OLD" 2>/dev/null)
-  if [ "${#PORNOMBRE[@]}" -gt 0 ] && [ -n "${PORNOMBRE[0]:-}" ]; then
-    echo "  removing ${#PORNOMBRE[@]} file(s) whose NAME carries '$OLD':"
-    for f in "${PORNOMBRE[@]}"; do echo "    $f"; rm -rf "$f"; done
+  if [ "${#BY_NAME[@]}" -gt 0 ] && [ -n "${BY_NAME[0]:-}" ]; then
+    echo "  removing ${#BY_NAME[@]} file(s) whose NAME carries '$OLD':"
+    for f in "${BY_NAME[@]}"; do echo "    $f"; rm -rf "$f"; done
   fi
-  RESTAN=$(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
+  REMAINING=$(find /home/"$NEW" /etc /usr/local /opt -xdev -mindepth 1 \
       -regextype posix-extended -regex "$RX_OLD" 2>/dev/null | wc -l)
-  [ "$RESTAN" -eq 0 ] && pass_check "no file name mentions $OLD" || fail_check "$RESTAN names still mention $OLD"
+  [ "$REMAINING" -eq 0 ] && pass_check "no file name mentions $OLD" || fail_check "$REMAINING names still mention $OLD"
 fi
 
 # The clipboard: the five pieces that can break it.
@@ -435,13 +435,13 @@ if [ "$OLD" != "$NEW" ]; then
   if ! command -v strings >/dev/null 2>&1; then
     echo "  ? /usr/local/bin binaries: can't check without 'strings'"
   else
-    SUCIOS=""
+    DIRTY=""
     for b in /usr/local/bin/*; do
       [ -f "$b" ] || continue
-      strings "$b" 2>/dev/null | grep -q "/home/$OLD" && SUCIOS="$SUCIOS $b"
+      strings "$b" 2>/dev/null | grep -q "/home/$OLD" && DIRTY="$DIRTY $b"
     done
-    [ -z "$SUCIOS" ] && pass_check "no /usr/local/bin binary mentions the builder" \
-                     || fail_check "binaries with the builder's path inside:$SUCIOS (see RUSTFLAGS/CARGO_HOME in stage3)"
+    [ -z "$DIRTY" ] && pass_check "no /usr/local/bin binary mentions the builder" \
+                     || fail_check "binaries with the builder's path inside:$DIRTY (see RUSTFLAGS/CARGO_HOME in stage3)"
   fi
 fi
 [ -f /root/failed-packages.txt ] && fail_check "/root/failed-packages.txt remains" \

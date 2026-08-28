@@ -7,10 +7,6 @@ manual steps in the UTM interface.
 
 ![Desktop](shots/hires.png)
 
-> 🇪🇸 A Spanish translation is available: **[README.es.md](README.es.md)**
-> (this page) · **[EMPEZAR.es.md](EMPEZAR.es.md)** (how to run it) ·
-> **[ARTICULO.es.md](ARTICULO.es.md)** (why it is built this way).
-
 ## Why not just install Omarchy?
 
 Not because it refuses to run — **because the packages do not exist**. Verified
@@ -294,7 +290,7 @@ which ships inside Google Chrome arm64 (`omarchy-arm-extras chrome spotify-web`)
   `-e`, four of the eight phases were structurally incapable of failing.
 
 The full write-up, including the audit that found 37 defects in this very
-script, is in [ARTICULO.md](ARTICULO.md).
+script, is in [ARTICLE.md](ARTICLE.md).
 
 ## Prior art, and where this fits
 
@@ -325,9 +321,8 @@ The trade is the one stated above: no GPU acceleration inside the VM.
 
 ```
 build-omarchy-arm.sh   the autonomous builder, with everything embedded
-EMPEZAR.md             how to run it — requirements, timings, troubleshooting
-ARTICULO.md            how it was figured out
-*.es.md, *.es.html     Spanish translations of the docs above
+START.md               how to run it — requirements, timings, troubleshooting
+ARTICLE.md             how it was figured out
 provision/src/         stage1..3.sh, repair.sh, sanitize.sh, omarchy-arm-extras, hooks/
 scripts/               qemu, expect harnesses, .utm bundle writer
 fixes/                 the 19 corrections found along the way, as a record
