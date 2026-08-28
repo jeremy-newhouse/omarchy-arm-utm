@@ -11,10 +11,10 @@ totalmente automatizada desde macOS: ni un clic en la interfaz de UTM.
 
 | | |
 |---|---|
-| **Cómo ejecutarlo** | [`EMPEZAR.md`](EMPEZAR.md) · [guía publicada](https://claude.ai/code/artifact/630abf6c-6d3e-4e92-81b2-bfc0a3073c70) |
+| **Cómo ejecutarlo** | [`EMPEZAR.es.md`](EMPEZAR.es.md) · [guía publicada](https://claude.ai/code/artifact/630abf6c-6d3e-4e92-81b2-bfc0a3073c70) (desactualizada: en español) |
 | **Imagen lista para descargar** | [`omarchy-arm-utm-v2.zip`](https://archive.org/details/omarchy-arm-utm) · 3,6 GB |
 | **Construir desde cero** | `./build-omarchy-arm.sh` · 76–83 min medidos, con todo |
-| **Por qué está hecho así** | [`ARTICULO.md`](ARTICULO.md) · [artículo publicado](https://claude.ai/code/artifact/c089d9ed-f880-4324-b601-815b22356d54) |
+| **Por qué está hecho así** | [`ARTICULO.es.md`](ARTICULO.es.md) · [artículo publicado](https://claude.ai/code/artifact/c089d9ed-f880-4324-b601-815b22356d54) (desactualizado: en español) |
 
 ---
 
@@ -125,8 +125,8 @@ muchas rutas que se arreglaran.
 
 **Los tres están corregidos en `omarchy-arm-utm-v2.zip`** (3,6 GB, un 45% menos
 que la primera). Para arreglar una VM que ya tengas, sin volver a descargar,
-ejecuta dentro [`fixes/18-avisos-que-no-se-apagan.sh`](fixes/18-avisos-que-no-se-apagan.sh),
-y para el portapapeles [`fixes/19-portapapeles.sh`](fixes/19-portapapeles.sh).
+ejecuta dentro [`fixes/18-persistent-notifications.sh`](fixes/18-persistent-notifications.sh),
+y para el portapapeles [`fixes/19-clipboard.sh`](fixes/19-clipboard.sh).
 
 ## Uso
 
@@ -242,10 +242,10 @@ que viene dentro de Google Chrome arm64 (`omarchy-arm-extras chrome spotify-web`
 
 ```
 build-omarchy-arm.sh   script autónomo con las piezas embebidas
-EMPEZAR.md             guía para ejecutarlo: requisitos y resolución de problemas
-ARTICULO.md            explicación paso a paso de cómo se llegó hasta aquí
-articulo.html          la misma, como página
-dist/                  omarchy-arm-utm.zip + sha256 + LEEME para el destinatario
+EMPEZAR.es.md          guía para ejecutarlo: requisitos y resolución de problemas
+ARTICULO.es.md         explicación paso a paso de cómo se llegó hasta aquí
+articulo.es.html       la misma, como página
+dist/                  omarchy-arm-utm.zip + sha256 + README (en inglés) para el destinatario
 dl/                    Alpine virt ISO (sha256) + rootfs de ALARM (MD5)
 provision/src/         stage1..3.sh repair.sh sanitize.sh omarchy-arm-extras hooks/
 scripts/               qemu-build.sh build.exp repair.exp make-utm.sh qemu-shot.sh omssh
@@ -332,8 +332,8 @@ Validado con una construcción completa desde cero el 25-08-2026: **8 de 8 fases
 El veredicto que emite el invitado por la consola serie:
 
 ```
-### H=1 Q=1 BINS=439 ROTOS=1 UNITS=7 VER=4 CLIP=5/5
-VEREDICTO_OK
+### H=1 Q=1 BINS=439 BROKEN=1 UNITS=7 VER=4 CLIP=5/5
+VERDICT_OK
 ```
 
 **Compilan 16 de las 17 herramientas.** `herdr` no, y no lo hará mientras los

@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 """
-omarchy-arm-vdagent — portapapeles compartido entre el anfitrión y Hyprland.
+omarchy-arm-vdagent — shared clipboard between the host and Hyprland.
 
-CÓMO FUNCIONA EL PORTAPAPELES DE SPICE, Y POR QUÉ ESTO EXISTE
+HOW THE SPICE CLIPBOARD WORKS, AND WHY THIS EXISTS
 
-    El cliente SPICE del anfitrión NO habla con el agente de sesión: habla con
-    el demonio spice-vdagentd por el puerto virtio. El demonio, a su vez,
-    multiplexa hacia los agentes de sesión por un socket Unix
-    (/run/spice-vdagentd/spice-vdagent-sock). Eso es lo que hace que funcione
-    en cualquier otra VM.
+    The host's SPICE client does NOT talk to the session agent: it talks to
+    the spice-vdagentd daemon over the virtio port. The daemon, in turn,
+    multiplexes out to the session agents over a Unix socket
+    (/run/spice-vdagentd/spice-vdagent-sock). That's what makes it work on
+    any other VM.
 
-    El agente oficial (spice-vdagent) implementa ese lado, pero entrega el
-    portapapeles a X11: vdagent.c:421 llama a
-    vdagent_clipboards_new(vdagent_display_get_x11(...)) y no hay una sola
-    referencia a wlr-data-control en su repositorio. Bajo Hyprland arranca y
-    muere con "cannot open display".
+    The official agent (spice-vdagent) implements that side, but hands the
+    clipboard off to X11: vdagent.c:421 calls
+    vdagent_clipboards_new(vdagent_display_get_x11(...)) and there isn't a
+    single reference to wlr-data-control anywhere in its repository. Under
+    Hyprland it starts up and dies with "cannot open display".
 
-    Este programa ocupa exactamente ese hueco: habla el protocolo udscs con
-    spice-vdagentd igual que el agente oficial, y al otro lado usa
-    wl-copy/wl-paste. El demonio sigue siendo quien habla con el anfitrión.
+    This program fills exactly that gap: it speaks the udscs protocol with
+    spice-vdagentd just like the official agent, and on the other side uses
+    wl-copy/wl-paste. The daemon is still the one talking to the host.
 
-    Un detalle que importa: vdagentd solo atiende al agente de la sesión
-    ACTIVA de seat0 (vdagentd.c:746). En una VM con Hyprland lanzado por SDDM
-    esa comprobación suele fallar, así que el demonio debe arrancarse con -X
+    One detail that matters: vdagentd only serves the agent of seat0's
+    ACTIVE session (vdagentd.c:746). In a VM where Hyprland is launched by
+    SDDM that check usually fails, so the daemon has to be started with -X
     (disable-session-integration, vdagentd.c:1258).
 
-    Solo texto. Ni imágenes ni ficheros.
+    Text only. No images, no files.
 """
 import os, sys, socket, struct, subprocess, threading, time, signal
 
@@ -42,28 +42,28 @@ VERSION               = 6
 CLIENT_DISCONNECTED   = 12
 
 SEL_CLIPBOARD = 0          # VD_AGENT_CLIPBOARD_SELECTION_CLIPBOARD
-TIPO_UTF8     = 1          # VD_AGENT_CLIPBOARD_UTF8_TEXT
+UTF8_TYPE     = 1          # VD_AGENT_CLIPBOARD_UTF8_TEXT
 
 DEBUG = bool(os.environ.get("VDAGENT_DEBUG"))
 def log(*a):
     if DEBUG: print("[vdagent]", *a, file=sys.stderr, flush=True)
 
 
-class Agente:
+class Agent:
     def __init__(self, sock):
         self.s = sock
         self.lock = threading.Lock()
-        self.ultimo_local = None
-        self.esperando = threading.Event()
-        self.recibido = None
+        self.last_local = None
+        self.waiting = threading.Event()
+        self.received = None
 
-    def enviar(self, tipo, arg1=0, arg2=0, datos=b""):
-        cab = struct.pack("<IIII", tipo, arg1, arg2, len(datos))
+    def send_(self, kind, arg1=0, arg2=0, data=b""):
+        header = struct.pack("<IIII", kind, arg1, arg2, len(data))
         with self.lock:
-            self.s.sendall(cab + datos)
-        log("→", tipo, arg1, arg2, len(datos))
+            self.s.sendall(header + data)
+        log("→", kind, arg1, arg2, len(data))
 
-    def _leer(self, n):
+    def _read(self, n):
         b = b""
         while len(b) < n:
             t = self.s.recv(n - len(b))
@@ -71,36 +71,36 @@ class Agente:
             b += t
         return b
 
-    def bucle(self):
+    def loop_(self):
         while True:
             try:
-                tipo, a1, a2, size = struct.unpack("<IIII", self._leer(16))
-                datos = self._leer(size) if size else b""
+                kind, a1, a2, size = struct.unpack("<IIII", self._read(16))
+                data = self._read(size) if size else b""
             except (EOFError, OSError) as e:
-                log("socket cerrado:", e); return
-            log("←", tipo, a1, a2, size)
+                log("socket closed:", e); return
+            log("←", kind, a1, a2, size)
 
-            if tipo == CLIPBOARD_GRAB:
-                # el anfitrión ofrece algo: lo pedimos
-                self.enviar(CLIPBOARD_REQUEST, SEL_CLIPBOARD, TIPO_UTF8)
+            if kind == CLIPBOARD_GRAB:
+                # the host is offering something: request it
+                self.send_(CLIPBOARD_REQUEST, SEL_CLIPBOARD, UTF8_TYPE)
 
-            elif tipo == CLIPBOARD_REQUEST:
-                texto = leer_portapapeles() or ""
-                self.enviar(CLIPBOARD_DATA, SEL_CLIPBOARD, TIPO_UTF8,
-                            texto.encode("utf-8"))
+            elif kind == CLIPBOARD_REQUEST:
+                text = read_clipboard() or ""
+                self.send_(CLIPBOARD_DATA, SEL_CLIPBOARD, UTF8_TYPE,
+                           text.encode("utf-8"))
 
-            elif tipo == CLIPBOARD_DATA:
-                if a2 == TIPO_UTF8:
-                    texto = datos.decode("utf-8", "replace")
-                    escribir_portapapeles(texto)
-                    self.ultimo_local = texto
-                    log("  recibido del anfitrion:", len(texto), "bytes")
+            elif kind == CLIPBOARD_DATA:
+                if a2 == UTF8_TYPE:
+                    text = data.decode("utf-8", "replace")
+                    write_clipboard(text)
+                    self.last_local = text
+                    log("  received from host:", len(text), "bytes")
 
-            elif tipo == VERSION:
-                log("  vdagentd version:", datos.decode("utf8", "replace").strip())
+            elif kind == VERSION:
+                log("  vdagentd version:", data.decode("utf8", "replace").strip())
 
 
-def leer_portapapeles():
+def read_clipboard():
     try:
         r = subprocess.run(["wl-paste", "--no-newline", "--type", "text/plain"],
                            capture_output=True, timeout=5)
@@ -109,16 +109,16 @@ def leer_portapapeles():
         return None
 
 
-def escribir_portapapeles(texto):
+def write_clipboard(text):
     try:
         subprocess.run(["wl-copy", "--type", "text/plain;charset=utf-8"],
-                       input=texto.encode("utf-8"), timeout=5)
+                       input=text.encode("utf-8"), timeout=5)
     except Exception as e:
-        log("wl-copy fallo:", e)
+        log("wl-copy failed:", e)
 
 
-def resolucion():
-    """La resolución real, si hyprctl está disponible; si no, un valor sensato."""
+def resolution():
+    """The real resolution, if hyprctl is available; otherwise a sane default."""
     try:
         r = subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, timeout=4)
         if r.returncode == 0:
@@ -130,15 +130,15 @@ def resolucion():
     return 1920, 1200
 
 
-def vigilar(ag):
-    """Si el usuario copia dentro de la VM, se lo ofrecemos al anfitrión."""
+def watch(ag):
+    """If the user copies something inside the VM, offer it to the host."""
     while True:
-        t = leer_portapapeles()
-        if t is not None and t != ag.ultimo_local:
-            ag.ultimo_local = t
+        t = read_clipboard()
+        if t is not None and t != ag.last_local:
+            ag.last_local = t
             if t:
-                ag.enviar(CLIPBOARD_GRAB, SEL_CLIPBOARD, 0,
-                          struct.pack("<I", TIPO_UTF8))
+                ag.send_(CLIPBOARD_GRAB, SEL_CLIPBOARD, 0,
+                          struct.pack("<I", UTF8_TYPE))
         time.sleep(1)
 
 
@@ -146,30 +146,30 @@ def main():
     for c in ("wl-paste", "wl-copy"):
         if subprocess.run(["sh", "-c", f"command -v {c}"],
                           capture_output=True).returncode != 0:
-            print(f"falta {c} (paquete wl-clipboard)", file=sys.stderr); return 1
+            print(f"missing {c} (wl-clipboard package)", file=sys.stderr); return 1
     if not os.path.exists(SOCK):
-        print(f"no existe {SOCK}.", file=sys.stderr)
-        print("Arranca el demonio:  sudo systemctl start spice-vdagentd",
+        print(f"{SOCK} does not exist.", file=sys.stderr)
+        print("Start the daemon:  sudo systemctl start spice-vdagentd",
               file=sys.stderr)
         return 1
 
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.connect(SOCK)
-    ag = Agente(s)
+    ag = Agent(s)
 
-    # El agente oficial anuncia su resolución nada más conectar; vdagentd lo
-    # usa para saber que hay una sesión gráfica viva detrás.
+    # The official agent announces its resolution right after connecting;
+    # vdagentd uses that to know there's a live graphical session behind it.
     # struct vdagentd_guest_xorg_resolution = 5 ints: width, height, x, y,
-    # display_id (vdagentd-proto.h:51). Si el tamaño no cuadra exactamente,
-    # vdagentd desconecta al agente sin más (vdagentd.c:1088).
-    ancho, alto = resolucion()
-    ag.enviar(GUEST_XORG_RESOLUTION, ancho, alto,
-              struct.pack("<iiiii", ancho, alto, 0, 0, 0))
+    # display_id (vdagentd-proto.h:51). If the size doesn't match exactly,
+    # vdagentd just disconnects the agent (vdagentd.c:1088).
+    width, height = resolution()
+    ag.send_(GUEST_XORG_RESOLUTION, width, height,
+             struct.pack("<iiiii", width, height, 0, 0, 0))
 
-    ag.ultimo_local = leer_portapapeles()
-    threading.Thread(target=vigilar, args=(ag,), daemon=True).start()
+    ag.last_local = read_clipboard()
+    threading.Thread(target=watch, args=(ag,), daemon=True).start()
     try:
-        ag.bucle()
+        ag.loop_()
     except KeyboardInterrupt:
         pass
     finally:

@@ -1,53 +1,52 @@
-# Cómo ejecutarlo
+# How to Run It
 
-> También publicada como página:
+> Also published as a page:
 > https://claude.ai/code/artifact/630abf6c-6d3e-4e92-81b2-bfc0a3073c70
 
-Dos caminos. El primero tarda diez minutos; el segundo, entre una hora y dos.
+Two paths. The first takes ten minutes; the second, one to two hours.
 
 | | |
 |---|---|
-| **Solo quiero la VM** | descarga [`omarchy-arm-utm-v2.zip`](https://archive.org/details/omarchy-arm-utm) (3,6 GB) y doble clic → [salta al final](#si-solo-quieres-la-vm) |
-| **Quiero construirla yo** | `./build-omarchy-arm.sh` → sigue leyendo |
+| **I just want the VM** | download [`omarchy-arm-utm-v2.zip`](https://archive.org/details/omarchy-arm-utm) (3.6 GB) and double-click → [jump to the end](#if-you-just-want-the-vm) |
+| **I want to build it myself** | `./build-omarchy-arm.sh` → keep reading |
 
 ---
 
-## 1 · Qué necesitas
+## 1 · What You Need
 
-| Requisito | Por qué | Cómo comprobarlo |
+| Requirement | Why | How to Check |
 |---|---|---|
-| **Mac con Apple Silicon** | la VM es aarch64 nativa con HVF; en Intel habría que emular y tardaría un día | `uname -m` → `arm64` |
-| **macOS con Homebrew** | el script instala `qemu`, `expect` y `aria2` si faltan | `brew --version` |
-| **UTM 4.7 o posterior** | es donde queda registrada la VM | `brew install --cask utm` |
-| **Command Line Tools** | el script usa `git` y `python3`, que en macOS vienen de ahí | `xcode-select -p` |
-| **~40 GB libres** | el disco de construcción llega a ~13 GB y la fase de empaquetado necesita otro tanto | `df -h ~` |
-| **Conexión decente** | descarga ~900 MB y luego ~1.500 paquetes desde los repos de Arch Linux ARM | |
+| **Apple Silicon Mac** | the VM is native aarch64 with HVF; on Intel you'd have to emulate and it would take a day | `uname -m` → `arm64` |
+| **macOS with Homebrew** | the script installs `qemu`, `expect`, and `aria2` if missing | `brew --version` |
+| **UTM 4.7 or later** | this is where the VM gets registered | `brew install --cask utm` |
+| **Command Line Tools** | the script uses `git` and `python3`, which come from there on macOS | `xcode-select -p` |
+| **~40 GB free** | the build disk reaches ~13 GB and the packaging phase needs about as much again | `df -h ~` |
+| **Decent connection** | downloads ~900 MB, then ~1,500 packages from the Arch Linux ARM repos | |
 
-Si falta algo, instálalo así:
+If something's missing, install it like this:
 
 ```bash
-xcode-select --install                    # git y python3
+xcode-select --install                    # git and python3
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install --cask utm
 ```
 
-**No hace falta `sudo`.** El script no toca nada del sistema anfitrión: todo lo
-que necesita lo escribe dentro de su directorio de trabajo, y las tres
-dependencias de Homebrew se instalan con tu usuario.
+**No `sudo` needed.** The script doesn't touch anything on the host system:
+everything it needs it writes inside its own working directory, and the three
+Homebrew dependencies install under your user.
 
-## 2 · Qué contexto necesita el script
+## 2 · What Context the Script Needs
 
-**Ninguno: es un solo fichero.** `build-omarchy-arm.sh` lleva embebidos los
-quince ficheros que necesita —las tres etapas de instalación, el sanitizador, el
-reparador, el instalador de apps opcionales, el hook de actualización, el agente
-del portapapeles y su puente, el montador de la carpeta compartida, la
-configuración de la VM, los dos arneses de `expect`, el lanzador de QEMU, el
-generador del bundle `.utm` y el LEEME que viaja dentro del zip—, y los escribe
-en disco al arrancar. Puedes copiarlo solo a él a otro Mac y funcionará
-igual.
+**None — it's a single file.** `build-omarchy-arm.sh` has the fifteen files it
+needs embedded — the three install stages, the sanitizer, the repair harness,
+the optional-app installer, the post-update hook, the clipboard agent and its
+bridge, the shared-folder mounter, the VM config, the two `expect` harnesses,
+the QEMU launcher, the `.utm` bundle generator, and the README that ships
+inside the zip — and writes them to disk on startup. You can copy just that
+one file to another Mac and it'll work the same.
 
-Lo único que sí puedes darle de antemano, para ahorrar ~900 MB de descarga, son
-las imágenes base:
+The one thing you can hand it ahead of time, to save ~900 MB of download, are
+the base images:
 
 ```bash
 mkdir -p ~/omarchy-arm-build/dl
@@ -55,157 +54,161 @@ cp alpine-virt-*-aarch64.iso  ~/omarchy-arm-build/dl/alpine-virt-aarch64.iso
 cp ArchLinuxARM-aarch64-*.tar.gz ~/omarchy-arm-build/dl/alarm-rootfs.tgz
 ```
 
-El directorio de trabajo es `~/omarchy-arm-build` salvo que pongas otro:
+The working directory is `~/omarchy-arm-build` unless you set another one:
 
 ```bash
 W=/Volumes/Externo/omarchy ./build-omarchy-arm.sh
 ```
 
-## 3 · Ejecutarlo
+## 3 · Running It
 
 ```bash
 ./build-omarchy-arm.sh
 ```
 
-Y ya está. Con terminal te hará primero seis preguntas **prerrellenadas con lo
-que detecta de tu Mac**, así que se contestan con Enter:
+And that's it. With a terminal, it'll first ask six questions **pre-filled
+with what it detects from your Mac**, so you can just hit Enter:
 
 ```
-━━━ configuracion ━━━
-  Zona horaria [Europe/Madrid]:            ← de /etc/localtime
-  Teclado (consola) [es]:                  ← de las preferencias de macOS
-  Teclado (Hyprland/Wayland) [es]:
-  Nucleos para la VM [6]:                  ← la mitad de tus núcleos de rendimiento
-  Memoria para la VM (MiB) [12288]:        ← según tu RAM
-  Tamano del disco [80G]:
+━━━ configuration ━━━
+  Timezone [Europe/Madrid]:                ← from /etc/localtime
+  Keyboard (console) [es]:                 ← from macOS preferences
+  Keyboard (Hyprland/Wayland) [es]:
+  Cores for the VM [6]:                    ← half your performance cores
+  Memory for the VM (MiB) [12288]:         ← based on your RAM
+  Disk size [80G]:
 ```
 
-Y luego las tres que **sí cambian el resultado**:
+Then the three that **do change the outcome**:
 
-- **¿Compilar las 17 herramientas de Omarchy que no existen para ARM?**
-  Son ~40 minutos. Si dices que no, el escritorio funciona igual pero faltarán
-  `ttfx` (el salvapantallas), `tensaku` (anotar capturas), `omacalc`, `omacut`,
-  `omawrite`, `aether`, `cliamp` y `omarchy-nvim`. `aether` y `cliamp` se pueden
-  añadir luego con `yay -S`; el resto no está en AUR para aarch64 y habría que
-  volver a compilarlos a mano, así que aquí decir que sí sale barato.
+- **Compile the 17 Omarchy tools that don't exist for ARM?**
+  ~40 minutes. If you say no, the desktop still works, but you'll be missing
+  `ttfx` (the screensaver), `tensaku` (annotate screenshots), `omacalc`,
+  `omacut`, `omawrite`, `aether`, `cliamp`, and `omarchy-nvim`. `aether` and
+  `cliamp` can be added later with `yay -S`; the rest aren't in the AUR for
+  aarch64 and you'd have to compile them by hand again, so saying yes here is
+  cheap.
 
-- **¿Incluir OBS Studio y Pinta?**
-  Son software libre, así que sí pueden viajar dentro de la imagen, y la que se
-  distribuye los lleva. Cuestan ~45 minutos: OBS se compila desde fuente (sin
-  el plugin de navegador, cuyo CEF es x86-only) y Pinta necesita el .NET arm64
-  oficial de Microsoft. Si dices que no, se añaden luego desde dentro con
+- **Include OBS Studio and Pinta?**
+  They're free software, so they can ship inside the image, and the published
+  one does. They cost ~45 minutes: OBS is compiled from source (without the
+  browser plugin, whose CEF is x86-only) and Pinta needs Microsoft's official
+  arm64 .NET. If you say no, add them later from inside with
   `omarchy-arm-extras pinta obs`.
 
-- **¿Preparar la imagen para repartir?**
-  - **No** (lo que propone la pregunta: basta con Enter): la VM se queda con tu
-    usuario y tu configuración. Se salta `sanitize` y `package`, y ahorras ~15
-    minutos. Aun así `sshd` queda deshabilitado, para que no se quede una VM
-    escuchando con una contraseña trivial.
-  - **Sí**: renombra el usuario a `omarchy`, borra claves SSH, identidad de git
-    e historiales, y genera un `.zip` de ~3,6 GB con su `sha256`.
+- **Prepare the image for distribution?**
+  - **No** (the question's default: just hit Enter): the VM keeps your user
+    and your configuration. It skips `sanitize` and `package`, saving ~15
+    minutes. Even so, `sshd` stays disabled, so you don't end up with a VM
+    listening with a trivial password.
+  - **Yes**: renames the user to `omarchy`, wipes SSH keys, git identity, and
+    history, and generates a ~3.6 GB `.zip` with its `sha256`.
 
-Para no responder nada:
+To skip all questions:
 
 ```bash
-./build-omarchy-arm.sh --yes        # valores por defecto, sin preguntar
+./build-omarchy-arm.sh --yes        # defaults, no prompts
 ```
 
-Sin terminal (cron, CI, `nohup`) tampoco pregunta: detecta que no hay tty.
+Without a terminal (cron, CI, `nohup`), it doesn't ask either: it detects
+there's no tty.
 
-## 4 · Qué va pasando y cuánto tarda
+## 4 · What Happens and How Long It Takes
 
-Medido en una construcción real sobre un M3 Max, con las herramientas
-compiladas y sin OBS ni Pinta:
+Measured on a real build on an M3 Max, with the tools compiled and without
+OBS or Pinta:
 
-| Fase | Qué hace | Tiempo |
+| Phase | What It Does | Time |
 |---|---|---|
-| `deps` | comprueba el Mac e instala qemu/expect/aria2 si faltan | segundos |
-| `fetch` | descarga Alpine y el rootfs de ALARM, verificando sha256 y MD5 | ~2 min |
-| `prepare` | calcula la lista de paquetes cruzando la rama viva de Omarchy con el índice de ARM | ~10 s |
-| `build` | arranca Alpine headless, particiona, despliega el rootfs y corre las tres etapas en chroot | **~40 min** |
-| `utm` | escribe el bundle `.utm` y lo registra en UTM | ~1 min |
-| `verify` | arranca la VM y le exige dentro siete condiciones: Hyprland y quickshell vivos, ≥400 comandos, ≤5 enlaces rotos, ≥6 unidades `omarchy-*`, versión 4 y el portapapeles completo. Si alguna falla, la construcción se detiene aquí | ~4 min |
-| `sanitize` | copia el disco y lo limpia para distribuir | ~10 min |
-| `package` | compacta el qcow2, crea el bundle y lo comprime | ~3 min |
+| `deps` | checks the Mac and installs qemu/expect/aria2 if missing | seconds |
+| `fetch` | downloads Alpine and the ALARM rootfs, verifying sha256 and MD5 | ~2 min |
+| `prepare` | computes the package list by cross-referencing Omarchy's live branch against the ARM index | ~10 s |
+| `build` | boots Alpine headless, partitions, deploys the rootfs, and runs the three stages in chroot | **~40 min** |
+| `utm` | writes the `.utm` bundle and registers it in UTM | ~1 min |
+| `verify` | boots the VM and checks seven conditions inside it: Hyprland and quickshell alive, ≥400 commands, ≤5 broken links, ≥6 `omarchy-*` units, version 4, and the clipboard working end to end. If any fails, the build stops here | ~4 min |
+| `sanitize` | copies the disk and strips it for distribution | ~10 min |
+| `package` | compacts the qcow2, builds the bundle, and compresses it | ~3 min |
 
-**Total: entre 76 y 83 minutos**, medido en dos tandas completas sobre un M3
-Max con los valores por defecto —con las 17 herramientas, con OBS y con Pinta,
-que es exactamente lo que lleva la imagen que se distribuye—, y el resultado son
-**3,6 GB** de `.zip`. Decir que no a OBS y Pinta ahorra unos 45 minutos: OBS se
-compila entero desde fuente y es, con diferencia, lo más caro del proceso.
+**Total: 76 to 83 minutes**, measured over two full runs on an M3 Max with
+the default values — with the 17 tools, with OBS, and with Pinta, which is
+exactly what the published image carries — and the result is a **3.6 GB**
+`.zip`. Saying no to OBS and Pinta saves about 45 minutes: OBS compiles
+entirely from source and is, by far, the most expensive part of the process.
 
-El directorio de trabajo llega a unos **24 GB** en el pico. El script exige 40
-GB libres porque los clones de APFS pueden empujarlo más arriba.
+The working directory peaks at about **24 GB**. The script requires 40 GB
+free because APFS clones can push it higher.
 
-La fase `build` no imprime casi nada mientras trabaja. Para verla por dentro:
+The `build` phase prints almost nothing while it works. To watch it from
+inside:
 
 ```bash
 tail -f ~/omarchy-arm-build/logs/build.log
 ```
 
-## 5 · Si algo falla
+## 5 · If Something Fails
 
-Cada fase es reanudable, así que **no hay que empezar de cero**:
+Every phase is resumable, so **you don't have to start from scratch**:
 
 ```bash
-./build-omarchy-arm.sh --from build   # reanudar desde ahí
-./build-omarchy-arm.sh --only package # repetir solo una fase
-./build-omarchy-arm.sh --list         # ver los nombres válidos
+./build-omarchy-arm.sh --from build   # resume from there
+./build-omarchy-arm.sh --only package # repeat just one phase
+./build-omarchy-arm.sh --list         # see the valid names
 ```
 
-Reanudar **no vuelve a preguntar**: lo contestado se guarda en
-`~/omarchy-arm-build/respuestas.env` y se recupera solo. Manda, por este orden,
-lo que pongas en el entorno, lo guardado, lo detectado de tu Mac y el valor por
-defecto — así `UTM_MEM=16384 ./build-omarchy-arm.sh --from utm` respeta tus
-16384. `--from` y `--only` son excluyentes y los dos exigen el nombre de una
-fase.
+Resuming **doesn't ask again**: what you answered is saved in
+`~/omarchy-arm-build/answers.env` and gets picked back up automatically.
+Precedence, in this order: what you set in the environment, what's saved,
+what's detected from your Mac, and the default — so
+`UTM_MEM=16384 ./build-omarchy-arm.sh --from utm` respects your 16384.
+`--from` and `--only` are mutually exclusive, and both require a phase name.
 
-Los logs quedan en `~/omarchy-arm-build/logs/`, uno por fase. El de `build` es
-el que importa: lleva la salida completa de las tres etapas dentro del invitado,
-con los prefijos `[stage1]`, `[stage2]` y `[stage3]`.
+Logs live in `~/omarchy-arm-build/logs/`, one per phase. The `build` one is
+the one that matters: it carries the full output of the three stages inside
+the guest, prefixed `[stage1]`, `[stage2]`, and `[stage3]`.
 
-Dos comportamientos deliberados que conviene conocer:
+Two deliberate behaviors worth knowing:
 
-- Si ya hay un disco construido, `build` **no lo borra**: lo mueve a
-  `omarchy-arm.qcow2.anterior` y empieza uno nuevo.
-- Si ya existe una VM en UTM con el mismo nombre, **no la borra**: registra la
-  nueva con la hora añadida al nombre.
+- If a built disk already exists, `build` **doesn't delete it**: it moves it
+  to `omarchy-arm.qcow2.previous` and starts a new one.
+- If a VM with the same name already exists in UTM, **it doesn't delete it**:
+  it registers the new one with the time appended to the name.
 
-Y uno que puede sorprender: para que UTM reconozca un bundle nuevo hay que
-reiniciar la aplicación, porque solo escanea `Documents` al arrancar. Si tienes
-VMs en marcha, el script te avisa y te deja decidir; en modo desatendido no las
-corta, y te dice que importes el bundle a mano con **Archivo → Importar**.
+And one that can be surprising: for UTM to recognize a new bundle, you have
+to restart the app, because it only scans `Documents` on startup. If you have
+VMs running, the script warns you and lets you decide; in unattended mode it
+doesn't stop them, and instead tells you to import the bundle by hand with
+**File → Import**.
 
-## 6 · Cuando termine
+## 6 · When It's Done
 
-La VM aparece en UTM. Arranca sola, sin pedir contraseña.
+The VM shows up in UTM. It boots on its own, no password prompt.
 
-**La tecla Option (⌥) actúa como SUPER**, porque macOS se queda con Cmd antes de
-que UTM lo reciba. ⌥+Space abre el menú de Omarchy, ⌥+Return un terminal, ⌥+K la
-lista completa de atajos.
+**The Option key (⌥) acts as SUPER**, because macOS intercepts Cmd before UTM
+receives it. ⌥+Space opens the Omarchy menu, ⌥+Return a terminal, ⌥+K the
+full list of shortcuts.
 
-Dentro, para instalar las apps que no vienen (1Password, Obsidian, Typora,
-LocalSend, Chrome):
+Inside, to install the apps that don't come bundled (1Password, Obsidian,
+Typora, LocalSend, Chrome):
 
 ```bash
 omarchy-arm-extras --list
-omarchy-arm-extras            # menú interactivo
+omarchy-arm-extras            # interactive menu
 ```
 
-## 7 · Para deshacerlo
+## 7 · To Undo It
 
 ```bash
-rm -rf ~/omarchy-arm-build           # el directorio de trabajo entero
+rm -rf ~/omarchy-arm-build           # the entire working directory
 ```
 
-Y borra la VM desde la propia interfaz de UTM. El script no ha tocado nada más
-de tu Mac.
+And delete the VM from UTM's own interface. The script hasn't touched
+anything else on your Mac.
 
 ---
 
-## Si solo quieres la VM
+## If You Just Want the VM
 
-Descarga **`omarchy-arm-utm-v2.zip`** de https://archive.org/details/omarchy-arm-utm (3,6 GB) y:
+Download **`omarchy-arm-utm-v2.zip`** from https://archive.org/details/omarchy-arm-utm (3.6 GB) and:
 
 ```bash
 shasum -a 256 -c omarchy-arm-utm-v2.zip.sha256
@@ -213,11 +216,12 @@ unzip omarchy-arm-utm-v2.zip
 open *.utm
 ```
 
-Usuario `omarchy`, contraseña `omarchy` (también para root). **Cámbiala nada más
-entrar con `passwd`.** El resto está en el `LEEME.md` que viene dentro del zip.
+User `omarchy`, password `omarchy` (also for root). **Change it as soon as
+you log in, with `passwd`.** The rest is in the `README.md` that comes inside
+the zip.
 
-Su `sha256` es `929eb816194a5cfc…`. Al lado hay un `omarchy-arm-utm.zip` de
-6,5 GB: es la primera entrega, y conserva el nombre corto para que los enlaces y
-checksums publicados con ella sigan apuntando a los bytes exactos para los que
-se escribieron. Esa es la única razón de que la buena lleve `-v2` en el nombre.
-`VERSIONS.md` compara las dos.
+Its `sha256` is `929eb816194a5cfc…`. Next to it is an `omarchy-arm-utm.zip`
+at 6.5 GB: it's the first release, and it keeps the short name so the links
+and checksums published with it keep pointing at the exact bytes they were
+written for. That's the only reason the good one carries `-v2` in its name.
+`VERSIONS.md` compares the two.

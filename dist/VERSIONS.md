@@ -73,8 +73,8 @@ image no longer carries and what was proven about it:
 You do not need to fetch 3.6 GB. Run these inside the VM:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ggalancs/omarchy-arm-utm/main/fixes/18-avisos-que-no-se-apagan.sh | bash
-curl -fsSL https://raw.githubusercontent.com/ggalancs/omarchy-arm-utm/main/fixes/19-portapapeles.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ggalancs/omarchy-arm-utm/main/fixes/18-persistent-notifications.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ggalancs/omarchy-arm-utm/main/fixes/19-clipboard.sh | bash
 ```
 
 ## What does not work in either

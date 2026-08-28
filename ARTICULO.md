@@ -1,179 +1,180 @@
-# Omarchy en un Mac con Apple Silicon: cuando la guía ya no sirve
+# Omarchy on Apple Silicon Mac: when the guide stops working
 
-Cómo reconstruir el escritorio de Omarchy sobre Arch Linux ARM dentro de UTM,
-por qué el camino oficial está cerrado, y los diez obstáculos que se descubren
-solo al chocar con ellos.
+How to rebuild the Omarchy desktop on Arch Linux ARM inside UTM, why the
+official path is closed, and the ten obstacles you only discover by hitting
+them.
 
 ---
 
-## El punto de partida
+## The starting point
 
-Omarchy es la distribución de escritorio de DHH: Arch Linux con Hyprland,
-temas cuidados y unas 430 utilidades propias. La pregunta era sencilla:
-**¿se puede tener eso en una máquina virtual en un Mac con Apple Silicon?**
+Omarchy is DHH's desktop distribution: Arch Linux with Hyprland, polished
+themes, and some 430 custom utilities. The question was simple:
+**can you get that on a virtual machine on an Apple Silicon Mac?**
 
-Existe una guía de referencia, la
-[discusión #452](https://github.com/basecamp/omarchy/discussions/452) del
-repositorio, que describe justo eso. El problema es que es de 2025 y el
-proyecto se mueve rápido.
+There's a reference guide, [discussion
+#452](https://github.com/basecamp/omarchy/discussions/452) of the repo, that
+describes exactly that. The problem is it's from 2025 and the project moves
+fast.
 
-### Lo primero: comprobar que la guía sigue siendo válida
+### First things first: check that the guide still holds
 
-Cuatro comprobaciones bastaron para descartarla. Ninguna requiere instalar nada:
+Four checks were enough to rule it out. None require installing anything:
 
 ```bash
-# 1. El endpoint que usa la guía
+# 1. The endpoint the guide uses
 curl -sI https://omarchy.org/install-bare | head -1
 # → HTTP/2 404
 
-# 2. El mirror de Omarchy, para aarch64
+# 2. The Omarchy mirror, for aarch64
 curl -sI https://stable-mirror.omarchy.org/core/os/aarch64/core.db | head -1
-# → HTTP/2 404          (el de x86_64 devuelve 200)
+# → HTTP/2 404          (the x86_64 one returns 200)
 
-# 3. El guard del instalador... en la rama 3.x
+# 3. The installer guard... on the 3.x branch
 curl -s https://raw.githubusercontent.com/basecamp/omarchy/master/install/preflight/guard.sh \
   | grep -A2 'x86 only'
 # → if [[ $(uname -m) != "x86_64" ]]; then
 # →   abort "x86_64 CPU"
 
-# 4. El estado real del soporte ARM, en el propio repositorio del ISO
+# 4. The real state of ARM support, in the ISO's own repo
 curl -s https://raw.githubusercontent.com/omacom-io/omarchy-iso/main/plans/aarch64-support.md \
   | head -20
 # → "Plan: aarch64 ... Target: a parallel generic UEFI aarch64 ISO"
 ```
 
-Ese cuarto punto es el más informativo: el equipo de Omarchy **ya escribió el
-plan** para soportar aarch64, y en ese documento enumeran los bloqueantes que
-ellos mismos tienen. Entre otros: *"`pkgs.omarchy.org/{stable,edge}/aarch64/`
+That fourth point is the most informative one: the Omarchy team **already
+wrote the plan** to support aarch64, and in that document they list the
+blockers they themselves have. Among others: *"`pkgs.omarchy.org/{stable,edge}/aarch64/`
 must serve a real repo. Probed today, both return 404"*.
 
-Hay un detalle que remata el asunto. El instalador de Omarchy sobrescribe la
-lista de mirrors completa —en quattro, desde `install/post-install/pacman.sh`—
-con `stable-mirror.omarchy.org/$repo/os/$arch`. En ARM, el primer `pacman -Syu`
-posterior falla, porque ese mirror no sirve aarch64.
+There's one detail that seals the matter. The Omarchy installer overwrites
+the entire mirror list — in quattro, from `install/post-install/pacman.sh` —
+with `stable-mirror.omarchy.org/$repo/os/$arch`. On ARM, the first `pacman
+-Syu` afterward fails, because that mirror doesn't serve aarch64.
 
-### Corrección: en quattro ese guard ya no existe
+### Correction: on quattro that guard no longer exists
 
-Meses después volví a comprobarlo y el punto 3 **había dejado de ser cierto**.
-Clonando las dos ramas:
+Months later I checked again, and point 3 **was no longer true**. Cloning
+both branches:
 
-| Rama | `install/preflight/guard.sh` | `uname -m` en todo el repo |
+| Branch | `install/preflight/guard.sh` | `uname -m` across the repo |
 |---|---|---|
-| `master` (3.8.x) | existe, línea 25 | 1 aparición |
-| **`quattro` (4.x, la de por defecto)** | **el directorio `preflight/` no existe** | **0 apariciones** |
+| `master` (3.8.x) | exists, line 25 | 1 occurrence |
+| **`quattro` (4.x, the default one)** | **the `preflight/` directory doesn't exist** | **0 occurrences** |
 
-Omarchy 4 **no se niega a correr en ARM64**. Lo que falta es el repositorio: el
-árbol es shell, Lua y QML, agnóstico de arquitectura, y el paquete `omarchy` en
-sí se declara `arch=('any')`. El bloqueo pasó de «se niega» a «no hay de dónde
-instalar», que es un problema mucho más pequeño —lo cerraría publicar unos 25
-paquetes aarch64— y que además explica por qué varios proyectos de terceros han
-tenido que montarse su propio repositorio por separado.
+Omarchy 4 **doesn't refuse to run on ARM64**. What's missing is the
+repository: the tree is shell, Lua, and QML, architecture-agnostic, and the
+`omarchy` package itself is declared `arch=('any')`. The blocker went from
+"refuses" to "nowhere to install from," which is a much smaller problem — it
+would be closed by publishing about 25 aarch64 packages — and it also
+explains why several third-party projects have had to stand up their own
+separate repository.
 
-Dejo el error a la vista en vez de reescribir la historia, porque es
-representativo: **verifiqué contra la rama equivocada**. `master` suena a rama
-principal; en este repositorio la de por defecto es `quattro`. La misma trampa
-que ya me había costado un arranque en modo emergencia, otra vez, en otro sitio.
+I'm leaving the mistake in view instead of rewriting history, because it's
+representative: **I checked against the wrong branch**. `master` sounds like
+the main branch; in this repo the default is `quattro`. The same trap that
+had already cost me an emergency-mode boot, again, in another place.
 
-### La decisión
+### The decision
 
-Si no se puede instalar Omarchy, se puede **reconstruir**: montar Arch Linux ARM
-con Hyprland y aplicarle el contenido real del repositorio de Omarchy —
-configuración, temas, utilidades—, que es donde está el 90 % de la experiencia.
+If Omarchy can't be installed, it can be **rebuilt**: set up Arch Linux ARM
+with Hyprland and apply the actual content of the Omarchy repository —
+config, themes, utilities — which is where 90% of the experience lives.
 
-Antes de escribir una línea de código conviene medir si eso da algo utilizable.
-Se puede saber sin instalar nada, cruzando la lista de paquetes de Omarchy con
-el índice de Arch Linux ARM:
+Before writing a line of code, it's worth measuring whether that produces
+anything usable. You can find out without installing anything, by
+cross-referencing Omarchy's package list against the Arch Linux ARM index:
 
 ```bash
-# Índice de paquetes de Arch Linux ARM para aarch64
+# Arch Linux ARM package index for aarch64
 curl -s http://mirror.archlinuxarm.org/aarch64/core/core.db   -o core.db
 curl -s http://mirror.archlinuxarm.org/aarch64/extra/extra.db -o extra.db
 mkdir db && cd db && tar -xzf ../core.db && tar -xzf ../extra.db
 ls -1 | sed -E 's/-[^-]+-[^-]+$//' | sort -u > ../alarm.txt
 
-# Lista de paquetes de Omarchy
+# Omarchy package list
 curl -s https://raw.githubusercontent.com/basecamp/omarchy/quattro/install/omarchy-base.packages \
   | grep -vE '^#|^$' > omarchy.txt
 
-comm -12 <(sort omarchy.txt) ../alarm.txt | wc -l   # disponibles
-comm -23 <(sort omarchy.txt) ../alarm.txt           # los que faltan
+comm -12 <(sort omarchy.txt) ../alarm.txt | wc -l   # available
+comm -23 <(sort omarchy.txt) ../alarm.txt           # the ones missing
 ```
 
-Resultado: **121 de 148 paquetes existen en ARM** por nombre exacto —123 si se
-sustituyen `nvim` por `neovim` y `ttf-jetbrains-mono-nerd-basic` por
-`ttf-jetbrains-mono-nerd`, que es lo que hace la fase `prepare`—. Los que faltan
-son apps
-propietarias (1Password, Spotify, Obsidian, Typora) y paquetes propios de
-Omarchy. Y lo importante: `hyprland`, `hyprlock`, `hypridle`, `waybar`,
-`quickshell`, `uwsm`, `sddm`, `mesa` y `chromium` están todos, con versiones al
-día. Arch Linux ARM va **a la par** de Arch: `firefox 154.0-1` en ambos.
+Result: **121 of 148 packages exist on ARM** under the exact name — 123 if you
+substitute `nvim` for `neovim` and `ttf-jetbrains-mono-nerd-basic` for
+`ttf-jetbrains-mono-nerd`, which is what the `prepare` phase does. The ones
+missing are proprietary apps (1Password, Spotify, Obsidian, Typora) and
+Omarchy's own packages. And the important part: `hyprland`, `hyprlock`,
+`hypridle`, `waybar`, `quickshell`, `uwsm`, `sddm`, `mesa`, and `chromium` are
+all there, at current versions. Arch Linux ARM **keeps pace** with Arch:
+`firefox 154.0-1` on both.
 
-Con esos números, el proyecto tiene sentido.
+With those numbers, the project makes sense.
 
 ---
 
-## La arquitectura del build
+## The build architecture
 
-Tres decisiones estructurales, cada una con su razón.
+Three structural decisions, each with its own reason.
 
-**Construcción sin interfaz gráfica.** Arrancar un instalador y hacer clic no es
-reproducible. Todo el proceso ocurre en una VM QEMU dirigida por `expect` a
-través de la consola serie. Si algo falla, se corrige el script y se repite.
+**Headless build.** Booting an installer and clicking through it isn't
+reproducible. The whole process happens in a QEMU VM driven by `expect` over
+the serial console. If something fails, you fix the script and rerun it.
 
-**Aceleración HVF.** Como el invitado es aarch64 y el anfitrión también, se
-puede usar el hipervisor nativo de macOS en vez de emular. La diferencia es de
-un orden de magnitud:
+**HVF acceleration.** Since the guest is aarch64 and so is the host, you can
+use macOS's native hypervisor instead of emulating. The difference is an
+order of magnitude:
 
 ```bash
 qemu-system-aarch64 -accel hvf -cpu host -M virt,highmem=on,gic-version=3 ...
 ```
 
-**Alpine como entorno de arranque.** Arch Linux ARM no publica un ISO
-instalador, solo un tarball de rootfs. Hace falta un Linux mínimo que particione
-el disco y despliegue ese tarball. Alpine `virt` pesa 88 MB, arranca en segundos
-y sale directo a una consola serie.
+**Alpine as the boot environment.** Arch Linux ARM doesn't publish an
+installer ISO, only a rootfs tarball. You need a minimal Linux that can
+partition the disk and deploy that tarball. Alpine `virt` weighs 88 MB, boots
+in seconds, and drops straight to a serial console.
 
-El esqueleto es:
+The skeleton looks like this:
 
 ```
-Alpine live (QEMU + HVF, consola serie)
-  └─ etapa 1: particionar, desplegar rootfs de ALARM, chroot
-       └─ etapa 2 (root): kernel, arranque UEFI, paquetes, usuario
-            └─ etapa 3 (usuario): Omarchy, AUR, temas
+Alpine live (QEMU + HVF, serial console)
+  └─ stage 1: partition, deploy the ALARM rootfs, chroot
+       └─ stage 2 (root): kernel, UEFI boot, packages, user
+            └─ stage 3 (user): Omarchy, AUR, themes
 ```
 
 ---
 
-## Paso a paso
+## Step by step
 
-### 1 · Dependencias
+### 1 · Dependencies
 
 ```bash
 brew install qemu expect aria2
 brew install --cask utm
 ```
 
-### 2 · Imágenes base, con verificación
+### 2 · Base images, with verification
 
 ```bash
 aria2c -x8 https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/alpine-virt-3.24.1-aarch64.iso
 aria2c -x8 http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz
 
-# El tarball se rehace cada pocas semanas: verifica siempre
+# The tarball is rebuilt every few weeks: always verify
 curl -s http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz.md5
 md5 -q ArchLinuxARM-aarch64-latest.tar.gz
 ```
 
-### 3 · Particionado y despliegue del rootfs
+### 3 · Partitioning and rootfs deployment
 
-Dentro de Alpine. Primer detalle no obvio: **hay que cargar el módulo btrfs a
-mano**. El kernel `virt` de Alpine lo trae como módulo pero no lo autocarga, y
-`mkfs.btrfs` funciona (es userspace) mientras que `mount` falla con un
-desconcertante *"Invalid argument"*.
+Inside Alpine. First non-obvious detail: **you have to load the btrfs module
+by hand**. Alpine's `virt` kernel ships it as a module but doesn't
+autoload it, and `mkfs.btrfs` works fine (it's userspace) while `mount` fails
+with a baffling *"Invalid argument"*.
 
 ```sh
 modprobe btrfs vfat
-grep -qw btrfs /proc/filesystems || exit 1   # comprobar de verdad
+grep -qw btrfs /proc/filesystems || exit 1   # actually check
 
 parted -s /dev/vda mklabel gpt
 parted -s /dev/vda mkpart OMBOOT fat32 1MiB 1025MiB
@@ -191,33 +192,34 @@ mkdir -p /mnt/home
 mount -o rw,noatime,compress=zstd:3,subvol=@home /dev/vda2 /mnt/home
 ```
 
-**Segundo detalle: la ESP se monta *después* de extraer el rootfs.** El tarball
-de ALARM contiene enlaces simbólicos en `/boot`, y vfat no los admite. Si la ESP
-está montada durante la extracción, `bsdtar` falla. La solución es extraer
-primero, descartar ese `/boot` y dejar que pacman lo repueble sobre la ESP ya
-montada:
+**Second detail: the ESP is mounted *after* extracting the rootfs.** The
+ALARM tarball contains symlinks under `/boot`, and vfat doesn't support them.
+If the ESP is mounted during extraction, `bsdtar` fails. The fix is to
+extract first, discard that `/boot`, and let pacman repopulate it over the
+now-mounted ESP:
 
 ```sh
-bsdtar -xpf alarm-rootfs.tgz -C /mnt      # -p preserva permisos y xattr
+bsdtar -xpf alarm-rootfs.tgz -C /mnt      # -p preserves permissions and xattrs
 rm -rf /mnt/boot && mkdir /mnt/boot
 mount /dev/vda1 /mnt/boot
 ```
 
-### 4 · Sistema base y arranque UEFI
+### 4 · Base system and UEFI boot
 
-Dentro del chroot. Arch Linux ARM tiene **su propio llavero**, distinto del de
-Arch:
+Inside the chroot. Arch Linux ARM has **its own keyring**, distinct from
+Arch's:
 
 ```bash
 pacman-key --init
-pacman-key --populate archlinuxarm     # no "archlinux"
+pacman-key --populate archlinuxarm     # not "archlinux"
 pacman -Syu --noconfirm
 pacman -S --noconfirm --needed base base-devel linux-aarch64 sudo git \
   networkmanager btrfs-progs dosfstools efibootmgr
 ```
 
-El initramfs necesita los módulos virtio explícitos, porque el `autodetect` de
-mkinitcpio se ejecuta en un chroot donde el kernel en marcha es el de Alpine:
+The initramfs needs the virtio modules listed explicitly, because
+mkinitcpio's `autodetect` runs inside a chroot where the running kernel is
+still Alpine's:
 
 ```bash
 sed -i 's/^MODULES=.*/MODULES=(virtio virtio_pci virtio_blk virtio_scsi virtio_net virtio_gpu btrfs)/' \
@@ -225,21 +227,22 @@ sed -i 's/^MODULES=.*/MODULES=(virtio virtio_pci virtio_blk virtio_scsi virtio_n
 mkinitcpio -P
 ```
 
-Y aquí el **tercer detalle no obvio**, el que decide si la VM arranca o no:
+And here's the **third non-obvious detail**, the one that decides whether the
+VM boots at all:
 
 ```bash
 bootctl --esp-path=/boot --no-variables install
 ```
 
-`--no-variables` evita escribir entradas en la NVRAM UEFI. ¿Por qué? Porque la
-NVRAM de la VM de construcción **no viaja** al bundle de UTM: son ficheros de
-variables distintos. El arranque tiene que depender de la ruta de reserva
-`\EFI\BOOT\BOOTAA64.EFI`, que `bootctl` instala igualmente. Si se confía en la
-NVRAM, la VM construye bien y luego no arranca en UTM.
+`--no-variables` avoids writing entries to UEFI NVRAM. Why? Because the build
+VM's NVRAM **doesn't travel** with the UTM bundle: they're separate variable
+files. Boot has to rely on the fallback path `\EFI\BOOT\BOOTAA64.EFI`, which
+`bootctl` installs regardless. If you rely on NVRAM, the VM builds fine and
+then won't boot in UTM.
 
-### 5 · Omarchy: la sorpresa
+### 5 · Omarchy: the surprise
 
-Aquí es donde el proyecto se complicó de verdad.
+This is where the project got genuinely complicated.
 
 ```bash
 git clone --depth 1 https://github.com/basecamp/omarchy.git ~/.local/share/omarchy
@@ -247,21 +250,21 @@ mkdir -p ~/.config
 cp -R ~/.local/share/omarchy/config/* ~/.config/
 ```
 
-Dos líneas y ya está, en teoría. En la práctica, Hyprland arrancó en **modo de
-emergencia**:
+Two lines and done, in theory. In practice, Hyprland booted into
+**emergency mode**:
 
 ```
 ⚠ Emergency mode tripped: A lua config error resulted in no binds being registered.
 cannot open /usr/share/omarchy/default/hypr/bootstrap.lua: No such file or directory
 ```
 
-Dos descubrimientos encadenados, y ambos merecen su propia sección.
+Two chained discoveries, and both deserve their own section.
 
 ---
 
-## Los obstáculos
+## The obstacles
 
-### 1 · `git clone` no trae `master`
+### 1 · `git clone` doesn't fetch `master`
 
 ```bash
 curl -s https://api.github.com/repos/basecamp/omarchy | jq -r .default_branch
@@ -271,71 +274,75 @@ curl -s https://raw.githubusercontent.com/basecamp/omarchy/master/version    # �
 curl -s https://raw.githubusercontent.com/basecamp/omarchy/quattro/version   # → 4.0.0.alpha
 ```
 
-La rama por defecto **no es `master`**. Un `git clone` sin `--branch` trae
-`quattro`, que es Omarchy 4, un producto distinto de la 3.8.5 que documenta
-`master`:
+The default branch **is not `master`**. A `git clone` without `--branch`
+fetches `quattro`, which is Omarchy 4, a different product from the 3.8.5
+that `master` documents:
 
 | | `master` (3.8.5) | `quattro` (4.x) |
 |---|---|---|
-| Barra | waybar | **quickshell** (`omarchy-shell`) |
-| Config de Hyprland | ficheros `.conf` | **Lua** (`hyprland.lua`) |
-| Distribución | scripts en el `$HOME` | **paquete pacman** en `/usr/share/omarchy` |
+| Bar | waybar | **quickshell** (`omarchy-shell`) |
+| Hyprland config | `.conf` files | **Lua** (`hyprland.lua`) |
+| Distribution | scripts in `$HOME` | **pacman package** in `/usr/share/omarchy` |
 
-Consecuencia práctica: yo había instalado la lista de paquetes de `master`
-—con waybar— en un sistema que corría `quattro` —que usa quickshell—. La barra
-sencillamente no existía. Y `quickshell 0.3.1` **sí está** en Arch Linux ARM;
-solo faltaba saber que hacía falta.
+Practical consequence: I had installed the `master` package list — with
+waybar — on a system running `quattro` — which uses quickshell. The bar
+simply didn't exist. And `quickshell 0.3.1` **is available** on Arch Linux
+ARM; I just didn't know I needed it.
 
-**Lección:** cuando un proyecto va rápido, comprueba la rama por defecto antes
-de leer su documentación.
+**Lesson:** when a project moves fast, check the default branch before
+reading its documentation.
 
-### 2 · Omarchy 4 es un paquete pacman
+### 2 · Omarchy 4 is a pacman package
 
-La versión 4 se distribuye como paquete, no como scripts en el `$HOME`. Ese
-paquete coloca ficheros en rutas fijas del sistema:
+Version 4 ships as a package, not as scripts in `$HOME`. That package places
+files at fixed system paths:
 
-- `/usr/share/omarchy` — el árbol completo
-- `/usr/bin/omarchy-*` — los binarios en el PATH
-- `/etc/profile.d/omarchy.sh` — el gancho para las shells
-- `/usr/share/uwsm/env.d/10-omarchy` — el gancho para la sesión gráfica
+- `/usr/share/omarchy` — the full tree
+- `/usr/bin/omarchy-*` — the binaries on PATH
+- `/etc/profile.d/omarchy.sh` — the hook for shells
+- `/usr/share/uwsm/env.d/10-omarchy` — the hook for the graphical session
 
-Aquí conviene precisar, porque yo mismo lo escribí mal al principio: **el
-paquete no es x86_64-only**. Su PKGBUILD declara `arch=('any')` —son scripts,
-Lua y QML— e instala los comandos en `/usr/bin`, con enlaces desde
-`/usr/share/omarchy/bin`. Lo x86_64-only es el **repositorio** donde se publica.
-En ARM no hay de dónde instalarlo, y ahí empieza el problema: clonar el
-repositorio en el `$HOME` deja `OMARCHY_PATH` sin definir, el `.bashrc` da
-error, Hyprland no encuentra su `bootstrap.lua` y nada del autostart funciona.
+Worth being precise here, because I got this wrong myself at first: **the
+package is not x86_64-only**. Its PKGBUILD declares `arch=('any')` — it's
+shell, Lua, and QML — and installs the commands into `/usr/bin`, symlinked
+from `/usr/share/omarchy/bin`. What's x86_64-only is the **repository** it's
+published from. On ARM there's nowhere to install it from, and that's where
+the problem starts: cloning the repo into `$HOME` leaves `OMARCHY_PATH`
+undefined, `.bashrc` errors out, Hyprland can't find its `bootstrap.lua`, and
+none of the autostart works.
 
-La solución es replicar a mano lo que haría el paquete:
+The fix is to replicate by hand what the package would do:
 
 ```bash
 sudo ln -sfn "$OMARCHY_PATH" /usr/share/omarchy
 for f in "$OMARCHY_PATH"/bin/*; do
-  sudo ln -sfn "$f" "/usr/bin/$(basename "$f")"           # 439 binarios
+  sudo ln -sfn "$f" "/usr/bin/$(basename "$f")"           # 439 binaries
 done
 sudo install -Dm644 "$OMARCHY_PATH/etc/profile.d/omarchy.sh" /etc/profile.d/omarchy.sh
 sudo install -Dm644 "$OMARCHY_PATH/default/uwsm/env.d/10-omarchy" \
   /usr/share/uwsm/env.d/10-omarchy
 ```
 
-Esto acabó en `/usr/bin`, no en `/usr/local/bin`. Empecé por `/usr/local/bin`
-para no pisar territorio de pacman, que parecía lo limpio, y rompía cosas: el
-árbol de Omarchy lleva `/usr/bin/omarchy-*` cableado en trece sitios, cinco de
-ellos ficheros `.service`. `/usr/local/bin` se sigue usando, pero solo para los
-envoltorios propios de ARM que necesitan ganar en el PATH.
+This ended up in `/usr/bin`, not `/usr/local/bin`. I started with
+`/usr/local/bin` to avoid stepping on pacman's territory, which seemed like
+the clean choice, and it broke things: the Omarchy tree has
+`/usr/bin/omarchy-*` hardcoded in thirteen places, five of them `.service`
+files. `/usr/local/bin` is still used, but only for the ARM-specific
+wrappers that need to win on PATH.
 
-Curiosidad: Omarchy tiene un mecanismo pensado exactamente para esto,
-`omarchy-dev-link`, que escribe `/etc/omarchy.conf` para apuntar el sistema a un
-checkout local. Existe para desarrollar Omarchy, pero sirve igual para este caso.
+Interesting aside: Omarchy has a mechanism built exactly for this,
+`omarchy-dev-link`, which writes `/etc/omarchy.conf` to point the system at a
+local checkout. It exists for developing Omarchy, but it works just as well
+for this case.
 
-### 3 · La tecla Super, secuestrada por macOS
+### 3 · The Super key, hijacked by macOS
 
-Omarchy usa SUPER para todo. En un Mac, SUPER es Cmd, y **macOS intercepta Cmd
-antes de que UTM lo reciba**: Cmd+Space abre Spotlight, no el menú de Omarchy.
+Omarchy uses SUPER for everything. On a Mac, SUPER is Cmd, and **macOS
+intercepts Cmd before UTM ever sees it**: Cmd+Space opens Spotlight, not the
+Omarchy menu.
 
-Se puede pelear con los permisos de captura de entrada de UTM, o resolverlo
-dentro del invitado en una línea:
+You can fight with UTM's input-capture permissions, or fix it inside the
+guest with one line:
 
 ```lua
 -- ~/.config/hypr/input.lua
@@ -347,18 +354,18 @@ hl.config({
 })
 ```
 
-`altwin:swap_lalt_lwin` intercambia Alt y Super. Resultado: la tecla **Option
-(⌥)** actúa como SUPER, y macOS no intercepta Option+Space.
+`altwin:swap_lalt_lwin` swaps Alt and Super. Result: the **Option (⌥)** key
+acts as SUPER, and macOS doesn't intercept Option+Space.
 
-De paso, otro detalle: Hyprland lee la distribución de teclado de `XKBLAYOUT` en
-`/etc/vconsole.conf`, no de `KEYMAP`. Poner solo `KEYMAP=es` deja Hyprland en
-`us`. Hay que escribir las dos.
+Along the way, another detail: Hyprland reads the keyboard layout from
+`XKBLAYOUT` in `/etc/vconsole.conf`, not from `KEYMAP`. Setting only
+`KEYMAP=es` leaves Hyprland on `us`. Both need to be set.
 
-### 4 · Ventanas que se abren invisibles
+### 4 · Windows that open invisible
 
-El síntoma más desconcertante: el escritorio se veía, el teclado funcionaba, los
-menús aparecían… pero al abrir un terminal no salía nada. `hyprctl` lo
-confirmaba:
+The most confusing symptom: the desktop was visible, the keyboard worked,
+menus appeared… but opening a terminal produced nothing on screen. `hyprctl`
+confirmed it:
 
 ```
 Window aaaad1ec7630 -> Alacritty:
@@ -367,50 +374,52 @@ Window aaaad1ec7630 -> Alacritty:
     workspace: 1
 ```
 
-Ventana mapeada, con tamaño, en el espacio visible. Y en pantalla, solo el
-fondo.
+Window mapped, sized, on the visible workspace. And on screen, only the
+background.
 
-La prueba que lo aisló fue comparar dos terminales:
+The test that isolated it was comparing two terminals:
 
 ```bash
-foot       # dibuja con buffers de memoria compartida (wl_shm)  → SE VE
-alacritty  # dibuja con EGL/GPU (dma-buf)                       → NO SE VE
+foot       # draws with shared-memory buffers (wl_shm)  → VISIBLE
+alacritty  # draws with EGL/GPU (dma-buf)                → NOT VISIBLE
 ```
 
-Es decir: bajo `virtio-gpu` con virgl, los clientes que usan GPU producen
-buffers que Hyprland no puede componer. El compositor renderiza lo suyo —barra,
-fondo, menús— pero las ventanas de aplicación quedan vacías.
+In other words: under `virtio-gpu` with virgl, clients that use the GPU
+produce buffers that Hyprland can't composite. The compositor renders its own
+stuff — bar, background, menus — but application windows stay empty.
 
-Lo que **no** lo arregla, comprobado uno a uno:
+What **doesn't** fix it, checked one by one:
 
-- `AQ_NO_MODIFIERS=1` — ya estaba activo
-- `render:explicit_sync` — eliminado en Hyprland 0.56
-- `render:cm_enabled = false` — sin efecto
+- `AQ_NO_MODIFIERS=1` — already active
+- `render:explicit_sync` — removed in Hyprland 0.56
+- `render:cm_enabled = false` — no effect
 
-Lo que sí:
+What does:
 
 ```bash
 # /etc/environment.d/90-vm-graphics.conf
 LIBGL_ALWAYS_SOFTWARE=1
 ```
 
-Mesa pasa a llvmpipe, los clientes entregan buffers `wl_shm` y todo se dibuja.
-El coste es real: se pierde la aceleración GL **dentro** de la VM. Como
-compensación conviene desactivar el blur y las sombras, que con render por CPU
-salen caros.
+Mesa switches to llvmpipe, clients deliver `wl_shm` buffers, and everything
+renders. The cost is real: GL acceleration is lost **inside** the VM. As a
+tradeoff, it's worth disabling blur and shadows, which get expensive under
+CPU rendering.
 
-Un matiz que costó una hora: al probarlo por SSH parecía no funcionar.
-`/etc/environment.d/` lo lee el **gestor de sesión de systemd**, no una shell de
-login. Una app lanzada desde SSH no hereda la variable; una lanzada desde la
-sesión gráfica sí. El fallo estaba en el método de prueba, no en la corrección.
+One nuance that cost an hour: testing over SSH made it look like it wasn't
+working. `/etc/environment.d/` is read by the **systemd session manager**,
+not a login shell. An app launched from SSH doesn't inherit the variable; one
+launched from the graphical session does. The bug was in the test method, not
+in the fix.
 
-### 5 · Cambiar la resolución en caliente rompe el render
+### 5 · Changing resolution on the fly breaks rendering
 
-Al fijar 1920x1200 con `hyprctl reload`, la pantalla se quedó **en blanco**. Las
-capas seguían ahí (`hyprctl layers` las listaba, con alfa 1), pero no se
-pintaban. Reiniciar el shell no bastó; hizo falta reiniciar la VM entera.
+Setting 1920x1200 with `hyprctl reload` left the screen **blank**. The layers
+were still there (`hyprctl layers` listed them, with alpha 1), but they
+weren't being painted. Restarting the shell wasn't enough; the whole VM had
+to be restarted.
 
-Aplicada **desde el arranque**, la misma resolución funciona perfectamente.
+Applied **from boot**, the same resolution works perfectly.
 
 ```lua
 -- ~/.config/hypr/monitors.lua
@@ -418,37 +427,37 @@ hl.env("GDK_SCALE", "1")
 hl.monitor({ output = "Virtual-1", mode = "1920x1200@60", position = "0x0", scale = 1 })
 ```
 
-Si tocas ese fichero, reinicia la VM en lugar de recargar la configuración.
-(El `scale = 1` también importa: Omarchy asume pantallas retina y con el valor
-por defecto todo sale gigante en una VM.)
+If you touch that file, restart the VM instead of reloading the config.
+(`scale = 1` matters too: Omarchy assumes retina screens and with the
+default value everything comes out gigantic in a VM.)
 
-### 6 · `omarchy-update` reventaba
+### 6 · `omarchy-update` was blowing up
 
-Al actualizar, la salida terminaba en error. El log de pacman contaba la
-historia:
+On update, the output ended in an error. The pacman log told the story:
 
 ```
-Running 'pacman -Rns --noconfirm dust'      → eliminado
-Running 'pacman -S --noconfirm tensaku'     → no existe en ARM → error
+Running 'pacman -Rns --noconfirm dust'      → removed
+Running 'pacman -S --noconfirm tensaku'     → doesn't exist on ARM → error
 ```
 
-Una **migración** de Omarchy había quitado `dust` para sustituirlo por
-`tensaku`, un paquete propio que en ARM no existe. Y dejó el sistema sin
-ninguno de los dos.
+An Omarchy **migration** had removed `dust` to replace it with `tensaku`, a
+custom package that doesn't exist on ARM. And it left the system with
+neither.
 
-La causa raíz estaba en el build:
+The root cause was in the build:
 
 ```bash
 ls ~/.local/state/omarchy/migrations | wc -l   # 8
 ls /usr/share/omarchy/migrations/*.sh | wc -l  # 83
 ```
 
-Un instalador normal de Omarchy **sella todas las migraciones al terminar**,
-porque un sistema recién instalado ya nace con el estado final: las migraciones
-existen para actualizar instalaciones antiguas. Al clonar el repositorio sin
-sellarlas, `omarchy-update` intentó reproducir 75 migraciones históricas.
+A normal Omarchy installer **seals every migration once it finishes**,
+because a freshly installed system is already born in the final state:
+migrations exist to bring old installs up to date. By cloning the repo
+without sealing them, `omarchy-update` tried to replay 75 historical
+migrations.
 
-Dos correcciones. La primera, sellar:
+Two fixes. First, seal them:
 
 ```bash
 mkdir -p ~/.local/state/omarchy/migrations
@@ -457,9 +466,9 @@ for f in /usr/share/omarchy/migrations/*.sh; do
 done
 ```
 
-La segunda es la que importa a largo plazo. `omarchy-pkg-add` aborta si un
-paquete no existe, y eso tumba la actualización entera. Un envoltorio en
-`/usr/local/bin` lo hace tolerante:
+The second is the one that matters long-term. `omarchy-pkg-add` aborts if a
+package doesn't exist, and that takes down the whole update. A wrapper in
+`/usr/local/bin` makes it tolerant:
 
 ```bash
 #!/bin/bash
@@ -472,47 +481,49 @@ for p in "$@"; do
     skip+=("$p")
   fi
 done
-((${#skip[@]})) && printf 'Omitido, no existe en ARM: %s\n' "${skip[*]}" >&2
+((${#skip[@]})) && printf 'Skipped, not available on ARM: %s\n' "${skip[*]}" >&2
 ((${#avail[@]})) || exit 0
 exec "$REAL" "${avail[@]}"
 ```
 
-Sin esto, cada paquete nuevo que Omarchy introduzca volvería a romper las
-actualizaciones.
+Without this, every new package Omarchy introduces would break updates
+again.
 
-### 7 · El escritorio gris: dos fallos que ningún log denunció
+### 7 · The gray desktop: two failures no log reported
 
-La última verificación antes de empaquetar fue mirar una captura del escritorio
-ya sanitizado. Arrancaba, la barra estaba, el reloj daba la hora. Pero el fondo
-era gris liso y las notificaciones, cajas grises sin estilo. Ni un error en
-`journalctl`, ni un aviso en pantalla. Dos causas independientes, y las dos
-comparten la misma forma: **el sistema seguía funcionando, solo que mal**.
+The last check before packaging was to look at a screenshot of the
+already-sanitized desktop. It booted, the bar was there, the clock showed
+the time. But the background was flat gray and notifications were plain gray
+boxes with no styling. Not one error in `journalctl`, not one warning on
+screen. Two independent causes, and both share the same shape: **the system
+kept working, just badly**.
 
-**`grep -r` no ve el destino de un enlace simbólico.** Al renombrar el usuario
-de `gabriel` a `omarchy` yo comprobaba el resultado así:
+**`grep -r` doesn't see where a symlink points.** When renaming the user from
+`gabriel` to `omarchy`, I checked the result like this:
 
 ```bash
-grep -rl '\bgabriel\b' /etc /home/omarchy/.config     # → 0 coincidencias
+grep -rl '\bgabriel\b' /etc /home/omarchy/.config     # → 0 matches
 ```
 
-Cero. Limpio. Salvo que el destino de un symlink no es *contenido* de un
-fichero: `grep` no lo lee. Y Omarchy guarda el tema y el fondo activos
-precisamente como enlaces:
+Zero. Clean. Except a symlink's target isn't *content* of a file: `grep`
+doesn't read it. And Omarchy stores the active theme and background
+precisely as symlinks:
 
 ```
 ~/.local/state/omarchy/current/background -> …/theme/backgrounds/1-quattro.webp
 ```
 
-La comprobación correcta es otra herramienta:
+The correct check is a different tool:
 
 ```bash
 find /home/$NEW /etc /usr/local /opt -xdev -type l -lname "*/home/$OLD/*"
 ```
 
-**439 enlaces colgando**, incluidos los **431 comandos `omarchy-*`** de
-`/usr/local/bin`, que apuntaban al home que ya no existía. El escritorio
-arrancaba porque quickshell lee de `/usr/share/omarchy`, pero cualquier comando
-del menú habría fallado. La reescritura es trivial una vez que los ves:
+**439 dangling links**, including the **431 `omarchy-*` commands** in
+`/usr/local/bin`, which pointed at the home directory that no longer existed.
+The desktop booted because quickshell reads from `/usr/share/omarchy`, but
+any menu command would have failed. Rewriting them is trivial once you see
+them:
 
 ```bash
 for l in "${BADLINKS[@]}"; do
@@ -521,97 +532,97 @@ for l in "${BADLINKS[@]}"; do
 done
 ```
 
-Y la verificación pasa a contar tres cosas que antes no miraba: enlaces al home
-viejo, enlaces rotos, y si el fondo activo resuelve.
+And verification now checks three things it didn't check before: links to
+the old home, broken links, and whether the active background resolves.
 
-**Instalé cuatro paquetes que Omarchy 4 jubila.** El segundo fallo era mío de
-raíz. Mi lista de paquetes «de infraestructura» venía de leer Omarchy 3, y
-arrastraba `mako`, `swayosd`, `walker` y `elephant`. Ninguno está en
-`omarchy-base.packages` de `quattro`. La documentación del propio repositorio lo
-dice sin rodeos, en `docs/notifications.md`:
+**I installed four packages that Omarchy 4 retires.** The second failure was
+entirely mine. My list of "infrastructure" packages came from reading
+Omarchy 3, and it dragged along `mako`, `swayosd`, `walker`, and `elephant`.
+None of them are in `quattro`'s `omarchy-base.packages`. The repo's own docs
+say so outright, in `docs/notifications.md`:
 
 > The shell is the notification daemon […] There is no dunst or mako.
 
-Y `bin/omarchy-upgrade-to-quattro` los desinstala explícitamente, junto con sus
-unidades de usuario. `mako` no es inerte: se activa por D-Bus al primer
-`notify-send` y **reclama `org.freedesktop.Notifications` antes que el shell**.
-El resultado es que quickshell pierde el nombre del bus y las notificaciones
-salen con el estilo por defecto de mako. Eso eran las cajas grises.
+And `bin/omarchy-upgrade-to-quattro` uninstalls them explicitly, along with
+their user units. `mako` isn't inert: it activates over D-Bus on the first
+`notify-send` and **claims `org.freedesktop.Notifications` before the shell
+does**. The result is that quickshell loses the bus name and notifications
+come out with mako's default styling. That's what the gray boxes were.
 
-El lanzador tampoco necesitaba a `walker`: en quattro el menú es un panel de
-quickshell (`omarchy-shell shell toggle omarchy.menu`), así que mi sustituto de
-`walker` basado en `fuzzel` era código muerto desde el primer día.
+The launcher didn't need `walker` either: in quattro the menu is a
+quickshell panel (`omarchy-shell shell toggle omarchy.menu`), so my
+`fuzzel`-based replacement for `walker` was dead code from day one.
 
-La lección no es «se me coló un paquete». Es que **la lista de paquetes de una
-distribución es una afirmación sobre su arquitectura, no un inventario**. Yo la
-completé con lo que recordaba de la versión anterior, y al hacerlo reintroduje
-un componente que la versión nueva había sustituido a propósito. Cruzar contra
-`omarchy-base.packages` —que es lo que hace la fase `prepare`— y no añadir nada
-por intuición habría evitado las dos horas de diagnóstico.
+The lesson isn't "a stray package slipped in." It's that **a distribution's
+package list is a statement about its architecture, not an inventory**. I
+filled it out from memory of the previous version, and in doing so
+reintroduced a component the new version had deliberately replaced.
+Cross-checking against `omarchy-base.packages` — which is what the `prepare`
+phase does — and not adding anything from intuition would have saved two
+hours of diagnosis.
 
----
+## The methodology error: "not available" isn't a category
 
-## El error de método: "no disponible" no es una categoría
+Cross-referencing Omarchy's package list against the Arch Linux ARM index
+turned up 25 absences. I filed them all into one bucket — "not available" —
+and moved on. That was a mistake, and it took a while to discover.
 
-Al cruzar la lista de paquetes de Omarchy con el índice de Arch Linux ARM salían
-25 ausencias. Las metí todas en un mismo cajón —"no disponibles"— y seguí
-adelante. Fue un error, y costó descubrirlo tarde.
+That bucket mixed two things that aren't comparable:
 
-Ese cajón mezclaba dos cosas incomparables:
+- **Impossible**: 1Password, Spotify, Obsidian, Typora. Proprietary binaries
+  built only for x86_64. Nothing to be done.
+- **Nobody's built it yet**: almost everything else.
 
-- **Imposible**: 1Password, Spotify, Obsidian, Typora. Binarios propietarios
-  compilados solo para x86_64. No hay nada que hacer.
-- **Nadie lo ha construido todavía**: casi todo lo demás.
+And I put `pinta` in the first bucket, which is the mistake inside the
+mistake: Pinta is free software and Microsoft publishes .NET for linux-arm64.
+Today it's compiled during the build and ships inside the image.
+Misclassifying a single line cost weeks without an image editor.
 
-Y metí `pinta` en el primer cajón, que es el error dentro del error: Pinta es
-software libre y Microsoft publica .NET para linux-arm64. Hoy se compila en el
-build y viaja dentro de la imagen. Clasificar mal una sola línea costó no tener
-editor de imágenes durante semanas.
+Working reactively — compiling only what visibly broke something — I ended
+up resolving `walker` and `elephant` believing there was no launcher without
+them (false: the menu is a quickshell panel, see finding 7),
+`xdg-terminal-exec` because it's `$TERMINAL`, and `ttfx` only once the
+screensaver threw an on-screen error. Everything else stayed in the bucket.
 
-Trabajando de forma reactiva —compilar solo lo que rompe algo visible— acabé
-resolviendo `walker` y `elephant` creyendo que sin ellos no había lanzador
-(falso: el menú es un panel de quickshell, ver el hallazgo 7),
-`xdg-terminal-exec` porque es `$TERMINAL`, y `ttfx` únicamente cuando el
-salvapantallas dio error en pantalla. El resto siguió en el cajón.
-
-La auditoría que debí hacer el primer día es esta, y se resuelve con dos
-consultas a la API de GitHub y una a la de AUR:
+The audit I should have run on day one is this, and it resolves with two
+calls to the GitHub API and one to the AUR API:
 
 ```bash
-# ¿Existe en AUR?
+# Does it exist on AUR?
 curl -s "https://aur.archlinux.org/rpc/v5/info?arg[]=tensaku&arg[]=aether&arg[]=cliamp" \
   | jq -r '.results[] | "\(.Name) \(.Version) \(.URL)"'
 
-# ¿En qué lenguaje está escrito? (decide si es portable)
+# What language is it written in? (decides whether it's portable)
 curl -s https://api.github.com/repos/omacom-io/omacalc | jq -r '.language'
 
-# ¿Qué dice su PKGBUILD?
+# What does its PKGBUILD say?
 curl -s https://raw.githubusercontent.com/omacom-io/omarchy-pkgs/master/pkgbuilds/omacalc/PKGBUILD \
   | grep -E '^(arch|makedepends)='
 ```
 
-El resultado desmonta el cajón:
+The result dismantles the bucket:
 
-| Paquete | Origen | Lenguaje | Por qué faltaba |
+| Package | Origin | Language | Why it was missing |
 |---|---|---|---|
-| `omacalc`, `omacut`, `omawrite` | omacom-io | Qt / C++ | **su PKGBUILD ya declara `aarch64`** |
+| `omacalc`, `omacut`, `omawrite` | omacom-io | Qt / C++ | **its PKGBUILD already declares `aarch64`** |
 | `aether`, `cliamp` | AUR | Go | portable |
-| `herdr`, `tensaku`, `hyprland-preview-share-picker` | AUR / omacom | Rust | `arch=(x86_64)` por omisión |
-| `omarchy-nvim`, `tobi-try` | omarchy-pkgs | — | `arch=any`, ni compilan |
-| `yaru-icon-theme`, `ttf-ia-writer` | AUR | — | iconos y fuentes |
-| `tzupdate`, `ufw-docker`, `mise-bin`, `localsend` | AUR | Python, shell, binario | portables |
+| `herdr`, `tensaku`, `hyprland-preview-share-picker` | AUR / omacom | Rust | `arch=(x86_64)` by default |
+| `omarchy-nvim`, `tobi-try` | omarchy-pkgs | — | `arch=any`, doesn't even compile |
+| `yaru-icon-theme`, `ttf-ia-writer` | AUR | — | icons and fonts |
+| `tzupdate`, `ufw-docker`, `mise-bin`, `localsend` | AUR | Python, shell, binary | portable |
 
-**De las 25 ausencias, 16 eran construibles**, y tres de ellas ni siquiera
-requerían tocar nada: solo que alguien ejecutara `makepkg` en una máquina ARM.
+**Of the 25 absences, 16 were buildable**, and three of them didn't even
+require touching anything: just someone running `makepkg` on an ARM machine.
 
-### Construirlas
+### Building them
 
-La observación clave es que muchos PKGBUILD declaran `arch=(x86_64)` porque el
-mantenedor solo compila para su máquina, no porque el código sea incompatible.
-Si es Rust, Go o C++ portable, basta con añadir la arquitectura:
+The key observation is that many PKGBUILDs declare `arch=(x86_64)` because
+the maintainer only builds for their own machine, not because the code is
+incompatible. If it's portable Rust, Go, or C++, adding the architecture is
+enough:
 
 ```bash
-build_omarchy_tool() {                 # <aur|omapkgs> <paquete>
+build_omarchy_tool() {                 # <aur|omapkgs> <package>
   local src="$1" pkg="$2"
   local dir="/tmp/omabuild/$pkg"
   pacman -Q "$pkg" >/dev/null 2>&1 && return 0
@@ -625,7 +636,7 @@ build_omarchy_tool() {                 # <aur|omapkgs> <paquete>
       cp -a "$dir/repo/pkgbuilds/$pkg/." "$dir/" && rm -rf "$dir/repo" ;;
   esac
 
-  # El punto del asunto: declarar aarch64 cuando el codigo es portable
+  # The whole point: declare aarch64 when the code is portable
   grep -qE "^arch=.*(aarch64|'any')" "$dir/PKGBUILD" || \
     sed -i "s/^arch=(\(.*\))/arch=(\1 'aarch64')/" "$dir/PKGBUILD"
 
@@ -633,8 +644,8 @@ build_omarchy_tool() {                 # <aur|omapkgs> <paquete>
 }
 ```
 
-Se construyen en orden de coste creciente —datos, Go, Qt, Rust— y ninguna es
-fatal: si una falla, el resto continúa.
+They build in order of increasing cost — data, Go, Qt, Rust — and none is
+fatal: if one fails, the rest continue.
 
 ```bash
 for spec in \
@@ -647,115 +658,116 @@ for spec in \
 done
 ```
 
-Y `ttfx`, que no está en AUR, directamente desde su repositorio:
+And `ttfx`, which isn't on AUR, straight from its own repo:
 
 ```bash
 git clone https://github.com/omacom-io/ttfx.git && cd ttfx
 cargo build --release && sudo install -Dm755 target/release/ttfx /usr/local/bin/ttfx
 ```
 
-Compilarlo todo lleva un rato —los tres proyectos en Rust son lo más lento— pero
-es tiempo de máquina, no de persona.
+Building all of it takes a while — the three Rust projects are the slowest
+part — but it's machine time, not human time.
 
-> **Una trampa de bash por el camino.** La función de arriba empezó así:
+> **A bash trap along the way.** The function above started out as:
 >
 > ```bash
-> local src="$1" pkg="$2" dir="/tmp/omabuild/$pkg"    # ← falla con set -u
+> local src="$1" pkg="$2" dir="/tmp/omabuild/$pkg"    # ← fails with set -u
 > ```
 >
-> Bash **expande todos los valores de un `local` antes de asignar ninguno**, así
-> que `$pkg` todavía no existe al construir `$dir`, y con `set -u` el script
-> aborta en la primera llamada. Hay que separarlo en dos sentencias.
+> Bash **expands every value in a `local` before assigning any of them**, so
+> `$pkg` doesn't exist yet when `$dir` is built, and with `set -u` the script
+> aborts on the first call. It has to be split into two statements.
 
-### El resultado
+### The result
 
-De las 25 ausencias, **20 quedaron instaladas**. Solo una resistió, y por un
-motivo concreto: `herdr` invoca `zig fetch` con la semántica de Zig 0.15 y los repos van por la
-0.16 —falla con *«no build.zig file found»*—. Conviene precisar que **esto no es
-cosa de ARM**: `zig 0.16.0-1` es la versión tanto en Arch Linux ARM como en
-x86_64, así que el mismo tropiezo lo tendría cualquiera.
-Construir Zig 0.15 desde fuente son horas, y es una herramienta de desarrollo,
-no parte del escritorio.
+Of the 25 absences, **20 ended up installed**. Only one held out, for a
+specific reason: `herdr` invokes `zig fetch` with Zig 0.15 semantics while
+the repos are on 0.16 — it fails with *"no build.zig file found"*. Worth
+noting **this has nothing to do with ARM**: `zig 0.16.0-1` is the version on
+both Arch Linux ARM and x86_64, so anyone would hit the same snag. Building
+Zig 0.15 from source is a matter of hours, and it's a development tool, not
+part of the desktop.
 
-El resto de ausencias son las genuinamente imposibles: binarios propietarios
-compilados solo para x86_64.
+The rest of the absences are the genuinely impossible ones: proprietary
+binaries built only for x86_64.
 
-Cuatro de los cinco tropiezos del camino fueron defectos de mi propio script, no
-incompatibilidades reales, y los cuatro romperían el build de cualquiera:
+Four of the five stumbles along the way were defects in my own script, not
+real incompatibilities, and all four would break anyone's build:
 
-| Síntoma | Causa |
+| Symptom | Cause |
 |---|---|
-| Muere en la primera llamada con `pkg: unbound variable` | Un único `local` expande **todos** los valores antes de asignar ninguno |
-| `Can not use 'any' architecture with other architectures` | El PKGBUILD trae `arch=(any)` **sin comillas** y la guarda solo miraba la forma entrecomillada |
-| El clon de AUR sale vacío | Las URL de AUR usan el **PackageBase**, que no siempre es el nombre del paquete: `yaru-icon-theme` vive en el repo `yaru` |
-| `failed to prepare transaction` al instalar | El PKGBUILD genera **varios subpaquetes** y solo uno tiene una dependencia ausente. Hay que compilar sin instalar e instalar el subpaquete concreto |
+| Dies on the first call with `pkg: unbound variable` | A single `local` expands **all** values before assigning any of them |
+| `Can not use 'any' architecture with other architectures` | The PKGBUILD carries `arch=(any)` **unquoted**, and the guard only checked the quoted form |
+| The AUR clone comes out empty | AUR URLs use the **PackageBase**, which isn't always the package name: `yaru-icon-theme` lives in the `yaru` repo |
+| `failed to prepare transaction` on install | The PKGBUILD produces **several subpackages**, and only one has a missing dependency. You have to build without installing, then install the specific subpackage |
 
-Y una ironía final: al instalar los iconos de Yaru, `pacman` se quejó de dos
-ficheros en conflicto… creados por el propio `theme-system.sh` de Omarchy,
-precisamente porque el tema no estaba instalado. Se resuelve con
-`--overwrite '/usr/share/icons/*'` y volviendo a aplicar los enlaces después.
+And one final irony: when installing the Yaru icons, `pacman` complained
+about two conflicting files… created by Omarchy's own `theme-system.sh`,
+precisely because the theme wasn't installed yet. It's resolved with
+`--overwrite '/usr/share/icons/*'` and reapplying the symlinks afterward.
 
-## ¿Y si pulso «Update System»?
+## What about hitting "Update System"?
 
-Es la pregunta que más importa a largo plazo, y la respuesta inicial era «no».
-Tres cosas lo impedían, y ninguna es evidente hasta que se lee el código.
+This is the question that matters most long-term, and the initial answer was
+"no." Three things prevented it, and none is obvious until you read the
+code.
 
-### El árbol de Omarchy nunca se actualizaba
+### The Omarchy tree never updated
 
-`omarchy-update` llama a `omarchy-update-dev`, cuya primera línea es:
+`omarchy-update` calls `omarchy-update-dev`, whose first line is:
 
 ```bash
 [[ $OMARCHY_PATH != "/usr/share/omarchy" ]] || exit 0
 ```
 
-Sale inmediatamente si `OMARCHY_PATH` es la ruta canónica, porque asume que ahí
-manda el paquete pacman. En una instalación ARM ahí hay un **checkout de git**,
-y nadie lo actualiza. El sistema recibiría paquetes nuevos mientras los scripts,
-temas y configuración de Omarchy quedan congelados para siempre.
+It exits immediately if `OMARCHY_PATH` is the canonical path, because it
+assumes the pacman package owns that location. On an ARM install, that's a
+**git checkout**, and nobody updates it. The system would receive new
+packages while Omarchy's scripts, themes, and config stay frozen forever.
 
-Se ve con dos comandos:
+You can see it with two commands:
 
 ```bash
-git -C /usr/share/omarchy log -1 --format=%h    # ed7bae4  (20 de agosto)
+git -C /usr/share/omarchy log -1 --format=%h    # ed7bae4  (August 20)
 git -C /usr/share/omarchy fetch --dry-run       # ed7bae4..2c247e3  quattro
 ```
 
-La solución encaja con el propio diseño de Omarchy: un hook en
-`~/.config/omarchy/hooks/post-update.d/` que hace el `git pull` y enlaza los
-binarios nuevos.
+The fix fits Omarchy's own design: a hook in
+`~/.config/omarchy/hooks/post-update.d/` that does the `git pull` and links
+the new binaries.
 
 ```bash
 git -C "$TREE" pull --ff-only
 for f in "$TREE"/bin/*; do
   t="/usr/bin/$(basename "$f")"
-  [ -e "$t" ] && [ ! -L "$t" ] && continue   # respeta los envoltorios propios
+  [ -e "$t" ] && [ ! -L "$t" ] && continue   # respects custom wrappers
   [ -L "$t" ] && continue
   sudo ln -sfn "$f" "$t"
 done
 sudo find /usr/bin -xtype l -delete
 ```
 
-### Sin red de seguridad
+### No safety net
 
-`omarchy-snapshot create` devuelve 127 si snapper no está instalado, y
-`omarchy-update` lo trata como «continúa sin instantánea». Es decir: cada
-actualización de una rolling release, sin posibilidad de volver atrás.
+`omarchy-snapshot create` returns 127 if snapper isn't installed, and
+`omarchy-update` treats that as "continue without a snapshot." In other
+words: every update on a rolling release, with no way back.
 
-`snapper` está en Arch Linux ARM y Omarchy trae su propio configurador:
+`snapper` is on Arch Linux ARM and Omarchy ships its own configurator:
 
 ```bash
 sudo pacman -S snapper
 sudo bash -euo pipefail /usr/share/omarchy/install/config/snapper.sh
 ```
 
-Con systemd-boot no hay selección de snapshot en el menú de arranque —eso lo
-aporta `limine-snapper-sync`— pero las instantáneas existen y se recuperan con
-`snapper rollback`.
+With systemd-boot there's no snapshot selection in the boot menu — that
+comes from `limine-snapper-sync` — but the snapshots exist and are restored
+with `snapper rollback`.
 
-### Un bucle infinito escondido en un symlink
+### An infinite loop hiding in a symlink
 
-Este lo introduje yo, y es el más instructivo. El envoltorio de
-`omarchy-pkg-add` se creó así:
+I introduced this one myself, and it's the most instructive. The
+`omarchy-pkg-add` wrapper was created like this:
 
 ```bash
 sudo tee /usr/local/bin/omarchy-pkg-add <<'WRAP'
@@ -765,126 +777,126 @@ exec "$REAL" "${avail[@]}"
 WRAP
 ```
 
-Parece correcto. El problema es que `/usr/local/bin/omarchy-pkg-add` **era un
-symlink al árbol**, y `tee` sigue los symlinks: reemplazó el script original de
-Omarchy por el envoltorio, cuyo `REAL` pasó a apuntar a sí mismo. Cada llamada
-se ejecutaba en bucle hasta colgar la actualización entera.
+Looks correct. The problem is that `/usr/local/bin/omarchy-pkg-add` **was a
+symlink into the tree**, and `tee` follows symlinks: it overwrote Omarchy's
+original script with the wrapper, whose `REAL` now pointed at itself. Every
+call recursed until it hung the whole update.
 
-No dio la cara antes porque solo se dispara cuando una migración instala un
-paquete, y todas estaban selladas. Apareció al llegar la primera migración
-nueva. Se detecta con `git status` en el árbol:
+It didn't surface earlier because it only fires when a migration installs a
+package, and all of them were sealed. It showed up the moment the first new
+migration landed. It's detectable with `git status` in the tree:
 
 ```
- M bin/omarchy-pkg-add        ← contenido modificado, no debería
+ M bin/omarchy-pkg-add        ← content modified, shouldn't be
 ```
 
-Dos lecciones: **`tee` sigue symlinks y `install` no**, y un checkout de git es
-un buen detector de escrituras accidentales en sitios que deberían ser
-inmutables.
+Two lessons: **`tee` follows symlinks and `install` doesn't**, and a git
+checkout is a good detector for accidental writes to places that should be
+immutable.
 
-### Y una tercera que descubrió el mismo `git status`
+### And a third one that the same `git status` uncovered
 
 ```
  mode change 100644 => 100755 bin/omarchy-remove-service-dropbox
 ```
 
-Un `chmod +x` sobre los binarios del árbol dejaba el checkout sucio, y
-`git pull --ff-only` se niega a actualizar con cambios pendientes. Se resuelve
-con `git config core.fileMode false` **antes** del chmod.
+A `chmod +x` over the tree's binaries left the checkout dirty, and `git pull
+--ff-only` refuses to update with pending changes. It's fixed with `git
+config core.fileMode false` **before** the chmod.
 
-### Resultado
+### Result
 
-Con eso, un ciclo completo pasa por prune, instantánea, `git pull` del árbol,
-llavero, `pacman -Syu`, migraciones, hook, AUR y mise:
+With that, a full cycle runs through prune, snapshot, tree `git pull`,
+keyring, `pacman -Syu`, migrations, hook, AUR, and mise:
 
 ```
-árbol Omarchy:      2c247e3  (0 ficheros sucios)
-migraciones:        84 selladas, 0 pendientes
+Omarchy tree:       2c247e3  (0 dirty files)
+migrations:         84 sealed, 0 pending
 snapshots:          5
-unidades fallidas:  0
+failed units:       0
 ```
 
-Incluyendo una migración nueva que llegó con el pull y se aplicó sola.
+Including a new migration that arrived with the pull and applied itself.
 
 ---
 
-## El bundle de UTM, escrito a mano
+## The UTM bundle, written by hand
 
-UTM no permite crear máquinas desde la línea de comandos: `utmctl` solo
-gestiona el ciclo de vida. Pero el formato `.utm` está documentado en el código
-fuente y un `config.plist` escrito a mano funciona perfectamente.
+UTM doesn't let you create machines from the command line: `utmctl` only
+manages the lifecycle. But the `.utm` format is documented in the source
+code, and a hand-written `config.plist` works perfectly.
 
-Tres cosas que hay que saber:
+Three things worth knowing:
 
-**Las diez claves de primer nivel son obligatorias.** Se decodifican con
-`decode()`, no con `decodeIfPresent()`: omitir aunque sea un `<array/>` vacío
-hace que UTM rechace el bundle. Son `Information`, `System`, `QEMU`, `Input`,
-`Sharing`, `Display`, `Drive`, `Network`, `Serial` y `Sound`.
+**The ten top-level keys are mandatory.** They're decoded with `decode()`,
+not `decodeIfPresent()`: omitting even an empty `<array/>` makes UTM reject
+the bundle. They are `Information`, `System`, `QEMU`, `Input`, `Sharing`,
+`Display`, `Drive`, `Network`, `Serial`, and `Sound`.
 
-**La mitad VARS del firmware UEFI aarch64 es `edk2-arm-vars.fd`**, no
-`edk2-aarch64-vars.fd`, que no existe. La mitad CODE la aporta UTM en tiempo de
-ejecución.
+**The aarch64 UEFI firmware VARS half is `edk2-arm-vars.fd`**, not
+`edk2-aarch64-vars.fd`, which doesn't exist. The CODE half is supplied by UTM
+at runtime.
 
-**UTM no vigila la carpeta de máquinas.** `listRefresh()` se ejecuta una sola
-vez, al arrancar la aplicación. Un bundle copiado ahí mientras UTM está abierto
-es invisible hasta que se cierra y se vuelve a abrir.
+**UTM doesn't watch the machines folder.** `listRefresh()` runs exactly once,
+at app startup. A bundle copied there while UTM is open stays invisible
+until you close and reopen the app.
 
-Las claves que importan para el rendimiento:
+The keys that matter for performance:
 
 ```xml
 <key>Architecture</key> <string>aarch64</string>
 <key>Target</key>       <string>virt</string>
-<key>Hypervisor</key>   <true/>                      <!-- HVF, sin emulación -->
+<key>Hypervisor</key>   <true/>                      <!-- HVF, no emulation -->
 <key>Hardware</key>     <string>virtio-gpu-gl-pci</string>
 <key>UEFIBoot</key>     <true/>
 ```
 
 ---
 
-## Preparar la imagen para distribuirla
+## Preparing the image for distribution
 
-Una imagen que va a usar otra persona lleva dentro más de lo que parece: claves
-SSH, el `machine-id`, las claves de host del servidor SSH, la identidad de git,
-historiales de shell, redes wifi guardadas y logs.
+An image someone else is going to use carries more inside than it looks:
+SSH keys, `machine-id`, the SSH server's host keys, git identity, shell
+history, saved wifi networks, and logs.
 
 ```bash
-# identidad de la máquina (se regeneran solas al arrancar)
+# machine identity (regenerates itself on boot)
 : > /etc/machine-id
 rm -f /etc/ssh/ssh_host_*
 
-# identidad personal
+# personal identity
 rm -rf /home/$U/.ssh /home/$U/.gnupg /home/$U/.gitconfig /home/$U/.bash_history
 rm -f  /etc/NetworkManager/system-connections/*
 
-# logs y cachés
+# logs and caches
 rm -rf /var/log/journal/* /var/cache/pacman/pkg/*
 
-# los respaldos que deja usermod contienen el usuario y el hash antiguos
+# the backups usermod leaves behind carry the old user and password hash
 rm -f /etc/passwd- /etc/shadow- /etc/group-
 
-# libera espacio no usado para que el qcow2 comprima mejor
+# frees unused space so the qcow2 compresses better
 fstrim -av
 ```
 
-Un detalle que se pasa por alto: si `/usr/share/omarchy` es un enlace simbólico
-al `$HOME` de un usuario, renombrar ese usuario rompe el sistema. Conviene
-convertirlo en un directorio real antes de renombrar nada.
+A detail that's easy to miss: if `/usr/share/omarchy` is a symlink into a
+user's `$HOME`, renaming that user breaks the system. Convert it into a real
+directory before renaming anything.
 
-Y después, compactar:
+Then, compact:
 
 ```bash
-# -c comprime los clusters dentro del propio qcow2: la imagen ocupa la mitad
-# tambien despues de descomprimir el zip, a cambio de descomprimir al leer
-qemu-img convert -c -O qcow2 dist.qcow2 slim.qcow2   # 11,6 GB → 6,6 GB
+# -c compresses clusters within the qcow2 itself: the image takes up half
+# the space even after unzipping, at the cost of decompressing on read
+qemu-img convert -c -O qcow2 dist.qcow2 slim.qcow2   # 11.6 GB → 6.6 GB
 qemu-img check slim.qcow2
 zip -r -1 omarchy-arm-utm.zip "Omarchy ARM.utm"
 ```
 
-Y una precaucion que solo se aprende rompiendola: **despues de sanitizar, la
-imagen no debe volver a arrancarse**. El primer arranque regenera
-`/etc/machine-id`, la semilla de aleatoriedad y los logs; si arrancas para
-comprobar algo, hay que repetir la sanitizacion. Verificar sin ensuciar se hace
-con una capa superpuesta:
+And a precaution you only learn by breaking it: **after sanitizing, the
+image must not boot again**. The first boot regenerates `/etc/machine-id`,
+the randomness seed, and the logs; if you boot it to check something, you
+have to redo the sanitization. Verifying without dirtying it is done with an
+overlay layer:
 
 ```bash
 qemu-img create -f qcow2 -b slim.qcow2 -F qcow2 prueba.qcow2
@@ -892,191 +904,197 @@ qemu-img create -f qcow2 -b slim.qcow2 -F qcow2 prueba.qcow2
 
 ---
 
-## Qué se obtiene, y qué no
+## What you get, and what you don't
 
-**Funciona:** Arch Linux ARM aarch64 nativo con HVF, kernel `linux-aarch64` 7.2,
-btrfs con subvolúmenes y compresión zstd, Hyprland 0.56.1 con el stack completo
-de Omarchy 4 —quickshell como barra, menú, OSD y demonio de notificaciones,
-hyprlock, hypridle, uwsm, SDDM con autologin—, los temas, los 439 comandos `omarchy-*`, y `omarchy-update`.
+**Works:** native Arch Linux ARM aarch64 with HVF, `linux-aarch64` 7.2
+kernel, btrfs with subvolumes and zstd compression, Hyprland 0.56.1 with the
+full Omarchy 4 stack — quickshell as bar, menu, OSD, and notification daemon,
+hyprlock, hypridle, uwsm, SDDM with autologin —, the themes, the 439
+`omarchy-*` commands, and `omarchy-update`.
 
-**No funciona:** la aceleración GL dentro de la VM (render por software), y
-`herdr`, que exige la semántica de Zig 0.15 cuando los repositorios ya van por la
-0.16 —en ARM y en x86_64 por igual—. Las apps propietarias (1Password, Obsidian,
-Typora, LocalSend, Chrome) no viajan dentro por licencia, pero todas tienen build
-ARM64 oficial y `omarchy-arm-extras` las trae de su origen.
+**Doesn't work:** GL acceleration inside the VM (rendered in software), and
+`herdr`, which requires Zig 0.15 semantics while the repos are already on
+0.16 — on ARM and x86_64 alike. Proprietary apps (1Password, Obsidian,
+Typora, LocalSend, Chrome) don't ship inside for licensing reasons, but all
+of them have an official ARM64 build and `omarchy-arm-extras` fetches them
+from source.
 
-**Y conviene decirlo claro:** esto no es Omarchy. Es una reconstrucción del
-escritorio de Omarchy sobre una base distinta. Omarchy soporta x86_64; cuando
-publiquen el ISO aarch64 que ya tienen planificado, este trabajo dejará de hacer
-falta.
+**And it's worth saying plainly:** this isn't Omarchy. It's a reconstruction
+of the Omarchy desktop on a different base. Omarchy supports x86_64; once
+they ship the aarch64 ISO they've already planned, this work stops being
+necessary.
 
 ---
 
-## Auditar el script: 37 defectos donde yo creía que no había ninguno
+## Auditing the script: 37 defects where I thought there were none
 
-La pregunta era simple: «¿tenemos un único script capaz de instalarlo TODO de
-cero evitando todos los problemas conocidos?». Mi impresión era que sí. Podría
-haber contestado eso.
+The question was simple: "do we have a single script capable of installing
+EVERYTHING from scratch while dodging every known issue?" My impression was
+yes. I could have just answered that.
 
-En lugar de fiarme de mi impresión, crucé el script contra sus propias fuentes
-de verdad —los 16 scripts de `fixes/`, los hallazgos de este artículo, una
-simulación de ejecución en un Mac limpio— y pasé cada hallazgo por un refutador
-independiente cuyo encargo era tumbarlo. Sobrevivieron **37**, nueve de ellos
-bloqueantes. Todos existían desde hacía días. Ninguno había dado la cara.
+Instead of trusting my impression, I cross-checked the script against its
+own sources of truth — the 16 scripts in `fixes/`, the findings in this
+article, a simulated run on a clean Mac — and ran every finding past an
+independent refuter whose job was to tear it down. **37** survived, nine of
+them blocking. All of them had existed for days. None had surfaced on its
+own.
 
-Se agrupan en tres formas, y las tres tienen algo en común: **el sistema seguía
-funcionando**.
+They group into three shapes, and all three share something in common: **the
+system kept working**.
 
-### 1 · Código muerto por permisos
+### 1 · Dead code from permissions
 
-`stage3` corre como usuario normal. Comprobaba así si tenía que instalar el
-instalador de apps opcionales:
+`stage3` runs as a normal user. It checked like this whether it needed to
+install the optional-apps installer:
 
 ```bash
 if [ -f /root/prov/omarchy-arm-extras ]; then
 ```
 
-`/root` es `0750`. Un usuario sin privilegios no puede ni hacer `stat` dentro,
-así que la condición **da falso sin dar error**. El bloque entero llevaba días
-sin ejecutarse jamás, en silencio. Lo mismo con el hook de actualización.
+`/root` is `0750`. An unprivileged user can't even `stat` inside it, so the
+condition **returns false without erroring**. The whole block had gone days
+without ever running once, silently. Same with the update hook.
 
-### 2 · Orden destructivo dentro del mismo script
+### 2 · Destructive ordering within the same script
 
-El sanitizador, en el paso 7:
+The sanitizer, in step 7:
 
 ```bash
 rm -rf /root/prov /root/.bash_history /root/.cache
 ```
 
-Y en los pasos 8a y 8b, veinticinco líneas más abajo, lee de `/root/prov` el
-hook y el instalador. Se borraba la entrada a sí mismo antes de usarla. El log
-decía, mansamente, «no venía en el ISO de reparación», y yo había culpado al
-nombre del fichero dentro del ISO.
+And in steps 8a and 8b, twenty-five lines further down, it reads the hook
+and the installer from `/root/prov`. It was deleting its own input before
+using it. The log quietly said "wasn't on the recovery ISO," and I'd blamed
+the filename inside the ISO.
 
-### 3 · Fases estructuralmente incapaces de fallar
+### 3 · Phases structurally incapable of failing
 
-Este es el sistémico, y el que más me interesa. El script usa `set -uo pipefail`
-**sin `-e`**, y cada fase es una función que devuelve el estado de su último
-comando, que casi siempre es un `ok "..."`. Resultado: cuatro de las ocho fases
-no podían fallar.
+This is the systemic one, and the one that interests me most. The script
+uses `set -uo pipefail` **without `-e`**, and each phase is a function that
+returns the status of its last command, which is almost always an `ok
+"..."`. Result: four of the eight phases couldn't fail.
 
-| Fase | Cómo se tragaba el error |
+| Phase | How it swallowed the error |
 |---|---|
-| `build` | `su - user -c stage3.sh \|\| warn` — un `stage3` que reventara entero daba disco correcto |
-| `utm` | `make-utm.sh ... \| tail -4` seguido de `ok` — el pipe descarta el código de salida |
-| `verify` | recogía `pgrep -c Hyprland` y no lo comparaba con nada |
-| `fetch` | anunciaba «MD5 verificado» aunque el `curl` del checksum hubiera fallado |
+| `build` | `su - user -c stage3.sh \|\| warn` — a `stage3` that blew up entirely still reported a correct disk |
+| `utm` | `make-utm.sh ... \| tail -4` followed by `ok` — the pipe discards the exit code |
+| `verify` | collected `pgrep -c Hyprland` and never compared it against anything |
+| `fetch` | announced "MD5 verified" even if the checksum's `curl` had failed |
 
-La forma común es reconocible: **un mensaje de éxito que no depende de nada**.
-Merece la pena buscarla a propósito en cualquier script largo: `grep -n "|| warn\|
-| tail" build.sh` encuentra la mayoría.
+The common shape is easy to spot: **a success message that depends on
+nothing**. It's worth hunting for it deliberately in any long script: `grep
+-n "|| warn\| | tail" build.sh` catches most of them.
 
-### Y uno en el propio arreglo
+### And one in the fix itself
 
-Al añadir el modo interactivo escribí un `confirm` con `${ans,,}` para pasar la
-respuesta a minúsculas. `bash -n` lo dio por bueno. Al probarlo bajo un terminal
-simulado con `expect`:
+While adding interactive mode, I wrote a `confirm` using `${ans,,}` to
+lowercase the answer. `bash -n` gave it a pass. Testing it under a simulated
+terminal with `expect`:
 
 ```
 build-omarchy-arm.sh: line 91: ${ans,,}: bad substitution
 ```
 
-`${var,,}` es de bash 4. **macOS trae bash 3.2**, y ahí un error de expansión
-aborta la función entera: `confirm` no devolvía «no», devolvía basura, y el
-script continuaba como si hubieras aceptado. Un fallo de la misma familia que
-los que estaba arreglando, cometido mientras los arreglaba.
+`${var,,}` is bash 4. **macOS ships bash 3.2**, and there an expansion error
+aborts the whole function: `confirm` didn't return "no," it returned
+garbage, and the script carried on as if you'd said yes. A bug from the same
+family as the ones I was fixing, committed while fixing them.
 
-La lección operativa: `bash -n` valida sintaxis, no semántica ni versión. Para
-código interactivo hay que ejecutarlo contra un pty de verdad.
+The operational lesson: `bash -n` validates syntax, not semantics or
+version. Interactive code has to be run against a real pty.
 
-### Y la única prueba que vale: ejecutarlo
+### And the only test that counts: running it
 
-Con los 37 arreglos puestos, todo verificado por lectura y con los payloads
-sincronizados byte a byte, quedaba la pregunta de siempre: ¿funciona? Una
-construcción completa de cero, ocho fases, sobre un M3 Max.
+With all 37 fixes in place, everything verified by reading and the payloads
+synced byte for byte, there was still the usual question: does it work? A
+full build from scratch, eight phases, on an M3 Max.
 
-Encontró **tres fallos más que ninguna lectura había visto**:
+It found **three more failures that no amount of reading had caught**:
 
-| Fallo | Cómo se manifestó |
+| Failure | How it showed up |
 |---|---|
-| `VM_FULLNAME=Omarchy ARM` sin comillas en `config.env` | al hacer `source`, `ARM` se ejecutaba como comando → chroot muerto con `rc=127` |
-| el heredoc de `verify` sin entrecomillar | el bash del **anfitrión** expandía los `$(...)`, así que las comprobaciones corrían en el Mac: `systemctl: command not found` |
-| `spice-vdagentd` es una unidad `static` | `systemctl enable` sobre ella no hace nada; hay que habilitar el `.socket` |
+| `VM_FULLNAME=Omarchy ARM` unquoted in `config.env` | on `source`, `ARM` ran as a command → chroot dead with `rc=127` |
+| `verify`'s heredoc left unquoted | the **host's** bash expanded the `$(...)`, so the checks ran on the Mac: `systemctl: command not found` |
+| `spice-vdagentd` is a `static` unit | `systemctl enable` on it does nothing; you have to enable the `.socket` |
 
-Los dos primeros los introduje yo al arreglar los otros treinta y siete. El
-tercero llevaba ahí desde el principio.
+I introduced the first two while fixing the other thirty-seven. The third
+had been there from the start.
 
-Y el resultado, ya con todo corregido:
+And the result, with everything now fixed:
 
 ```
-16/17 herramientas compiladas (solo falla herdr, por la version de Zig)
-extras=si  menu=si  hook=si          ← los tres bloqueantes, resueltos
-verify dentro del invitado:
-  ### H=1 Q=1 BINS=439 ROTOS=1 UNITS=7 VER=4 CLIP=5/5
-  VEREDICTO_OK
-imagen final: 3,6 GB · 76 min de deps a package
+16/17 tools compiled (only herdr fails, due to the Zig version)
+extras=yes  menu=yes  hook=yes          ← the three blockers, resolved
+verify inside the guest:
+  ### H=1 Q=1 BINS=439 BROKEN=1 UNITS=7 VER=4 CLIP=5/5
+  VERDICT_OK
+final image: 3.6 GB · 76 min deps to package
 ```
 
-Ese veredicto es de la tanda de certificación, con el constructor ya corregido.
-Conviene mirarlo dos veces, porque durante meses no significó nada: el anfitrión
-lo comprobaba con `grep -qa VEREDICTO_OK` sobre el log, y el log contiene el
-**eco** del propio comando, que lleva dentro `then echo VEREDICTO_OK`. La fase
-no podía fallar. Lo demuestra el log de la imagen que llegué a publicar: la
-línea 6 es el eco, la línea 8 dice `VEREDICTO_KO`, y el constructor cantó éxito.
-Ahora el token viaja partido —`VERED"ICTO_OK"`—, que es algo que el eco no puede
-contener.
+That verdict is from the certification run, with the builder already fixed.
+It's worth looking at twice, because for months it meant nothing: the host
+checked it with `grep -qa VERDICT_OK` on the log, and the log contains the
+**echo** of the command itself, which has `then echo VERDICT_OK` inside
+it. The phase could not fail. The log from the image I actually shipped
+proves it: line 6 is the echo, line 8 says `VERDICT_KO`, and the builder
+declared success anyway. Now the token travels split —
+`VER"DICT_OK"` — something the echo can't reproduce.
 
-Ese `extras=si menu=si hook=si` es la prueba que importa: son los tres que
-llevaban días sin instalarse nunca, en silencio, y que ninguna ejecución previa
-había denunciado porque el script se declaraba correcto igualmente.
+That `extras=yes menu=yes hook=yes` is the proof that matters: those are the
+three that had gone days without ever installing, silently, and that no
+prior run had reported because the script declared itself correct
+regardless.
 
 ---
 
-## Reproducirlo
+## Reproducing it
 
-El proceso completo está en un único script con fases reanudables:
+The whole process lives in a single script with resumable phases:
 
 ```bash
-./build-omarchy-arm.sh              # pregunta lo justo y construye
-./build-omarchy-arm.sh --yes        # desatendido, con los valores por defecto
-./build-omarchy-arm.sh --from build # reanudar desde una fase
-./build-omarchy-arm.sh --list       # ver las fases
+./build-omarchy-arm.sh              # asks the minimum, then builds
+./build-omarchy-arm.sh --yes        # unattended, with defaults
+./build-omarchy-arm.sh --from build # resume from a phase
+./build-omarchy-arm.sh --list       # list the phases
 ```
 
-Fases: `deps`, `fetch`, `prepare`, `build`, `utm`, `verify`, `sanitize`,
+Phases: `deps`, `fetch`, `prepare`, `build`, `utm`, `verify`, `sanitize`,
 `package`.
 
-Con terminal pregunta seis cosas, todas prerrellenadas con lo que detecta del
-Mac —zona horaria de `/etc/localtime`, teclado de las preferencias de macOS,
-núcleos y RAM de `sysctl`—, de modo que se contestan con Enter. Tres cambian el
-resultado: si compilar las herramientas (~40 min), si incluir OBS Studio y Pinta
-(~45 min, lo más caro de todo) y si preparar la imagen para repartir. Elegir «VM
-para ti» recorta las fases a `deps…verify` y conserva tu usuario. Sin terminal, o
-con `--yes`, no pregunta nada y construye la imagen completa, lista para
-repartir.
+With a terminal it asks six things, all pre-filled from what it detects on
+the Mac — timezone from `/etc/localtime`, keyboard from macOS preferences,
+cores and RAM from `sysctl` — so they're answered with Enter. Three of them
+change the outcome: whether to compile the extra tools (~40 min), whether to
+include OBS Studio and Pinta (~45 min, the most expensive part of all), and
+whether to prepare the image for distribution. Choosing "VM for yourself"
+trims the phases down to `deps…verify` and keeps your user. Without a
+terminal, or with `--yes`, it asks nothing and builds the full image, ready
+to distribute.
 
-Preguntar solo eso es deliberado. Los otros quince parámetros —versión de
-Alpine, URL del rootfs, rama de Omarchy, locales— son detalles de
-implementación, no decisiones: una pregunta que nadie quiere responder es
-ruido.
+Asking only that much is deliberate. The other fifteen parameters — Alpine
+version, rootfs URL, Omarchy branch, locales — are implementation details,
+not decisions: a question nobody wants to answer is noise.
 
-La fase `prepare` merece un comentario. En lugar de llevar una lista fija de
-paquetes, la calcula en cada ejecución cruzando la rama viva de Omarchy con el
-índice de Arch Linux ARM. Así el build no se rompe cuando Omarchy cambie de
-paquetes —que lo hará—, y de paso informa de qué se ha quedado fuera.
+The `prepare` phase deserves a comment. Instead of carrying a fixed package
+list, it computes one on every run by cross-referencing Omarchy's live
+branch against the Arch Linux ARM index. That way the build doesn't break
+when Omarchy changes its packages — which it will — and it reports along the
+way what got left out.
 
 ---
 
-## Lo que enseña este ejercicio
+## What this exercise teaches
 
-Casi todo el tiempo se fue en cosas que no se pueden anticipar leyendo
-documentación: una rama por defecto que no es la que documenta el proyecto, un
-cambio de modelo de distribución a mitad de versión, un problema de composición
-gráfica que solo se aísla comparando dos terminales distintos, y una máquina de
-estado —las migraciones— que un instalador inicializa y un clon de git no.
+Almost all the time went into things you can't anticipate by reading
+documentation: a default branch that isn't the one the project documents, a
+distribution-model change mid-version, a graphics-compositing problem that
+only isolates by comparing two different terminals, and a state machine —
+the migrations — that an installer initializes and a git clone doesn't.
 
-El patrón que más rentabilidad dio fue **construir la prueba discriminante**:
-cuando las ventanas no se veían, comparar `foot` contra `alacritty` señaló la
-causa en un minuto, después de un buen rato dando palos de ciego con variables
-de entorno. Y el error que más tiempo costó fue confiar en un método de prueba
-—lanzar aplicaciones por SSH— que no reproducía las condiciones reales.
+The pattern that paid off the most was **building the discriminating test**:
+when windows weren't showing up, comparing `foot` against `alacritty`
+pinpointed the cause in a minute, after a good while flailing at environment
+variables. And the mistake that cost the most time was trusting a test
+method — launching apps over SSH — that didn't reproduce the real
+conditions.

@@ -1,76 +1,76 @@
 #!/bin/bash
 #
-#  omarchy-arm-share — monta la carpeta que compartes desde UTM.
+#  omarchy-arm-share — mounts the folder you share from UTM.
 #
-#  UTM tiene dos modos y el usuario elige uno en Ajustes de la VM → Compartir:
+#  UTM has two modes and the user picks one in VM Settings → Sharing:
 #
-#    VirtFS       dispositivo 9p con mount_tag "share". Se monta directo.
-#    SPICE WebDAV puerto virtio org.spice-space.webdav.0. spice-webdavd lo
-#                 sirve en http://localhost:9843/ y se monta con davfs2.
+#    VirtFS       9p device with mount_tag "share". Mounts directly.
+#    SPICE WebDAV virtio port org.spice-space.webdav.0. spice-webdavd serves
+#                 it at http://localhost:9843/ and it's mounted with davfs2.
 #
-#  Este script detecta cuál está activo y hace lo que toque. Sin argumentos
-#  monta; con --umount desmonta; con --status dice qué hay.
+#  This script detects which one is active and does whatever's needed. With no
+#  arguments it mounts; with --umount it unmounts; with --status it reports what's there.
 #
 set -uo pipefail
-PUNTO="${OMARCHY_SHARE_MNT:-/mnt/share}"
+MOUNT_POINT="${OMARCHY_SHARE_MNT:-/mnt/share}"
 TAG=share
-PUERTO_WEBDAV=/dev/virtio-ports/org.spice-space.webdav.0
+WEBDAV_PORT=/dev/virtio-ports/org.spice-space.webdav.0
 URL=http://localhost:9843/
 
-hay_9p()     { grep -qw 9p /proc/filesystems 2>/dev/null && [ -e /sys/bus/virtio/drivers/9pnet_virtio ]; }
-hay_webdav() { [ -e "$PUERTO_WEBDAV" ]; }
-montado()    { mountpoint -q "$PUNTO"; }
+has_9p()     { grep -qw 9p /proc/filesystems 2>/dev/null && [ -e /sys/bus/virtio/drivers/9pnet_virtio ]; }
+has_webdav() { [ -e "$WEBDAV_PORT" ]; }
+mounted()    { mountpoint -q "$MOUNT_POINT"; }
 
-estado() {
-  echo "  punto de montaje: $PUNTO"
-  echo "  montado:          $(montado && echo sí || echo no)"
-  echo "  modo VirtFS (9p): $(hay_9p && echo disponible || echo no)"
-  echo "  modo SPICE WebDAV:$(hay_webdav && echo ' disponible' || echo ' no')"
-  if hay_webdav; then
+status() {
+  echo "  mount point:      $MOUNT_POINT"
+  echo "  mounted:          $(mounted && echo yes || echo no)"
+  echo "  VirtFS mode (9p): $(has_9p && echo available || echo no)"
+  echo "  SPICE WebDAV mode:$(has_webdav && echo ' available' || echo ' no')"
+  if has_webdav; then
     echo "  spice-webdavd:    $(systemctl is-active spice-webdavd 2>&1)"
   fi
-  montado && { echo "  contenido:"; ls -la "$PUNTO" 2>/dev/null | head -6 | sed 's/^/    /'; }
+  mounted && { echo "  contents:"; ls -la "$MOUNT_POINT" 2>/dev/null | head -6 | sed 's/^/    /'; }
 }
 
-montar() {
-  montado && { echo "ya está montado en $PUNTO"; return 0; }
-  sudo mkdir -p "$PUNTO"
+mount_() {
+  mounted && { echo "already mounted at $MOUNT_POINT"; return 0; }
+  sudo mkdir -p "$MOUNT_POINT"
 
-  # 1) VirtFS: lo más simple, si el dispositivo está
-  if sudo mount -t 9p -o trans=virtio,version=9p2000.L,rw,msize=512000 "$TAG" "$PUNTO" 2>/dev/null; then
-    echo "montado por VirtFS (9p) en $PUNTO"; return 0
+  # 1) VirtFS: simplest option, if the device is present
+  if sudo mount -t 9p -o trans=virtio,version=9p2000.L,rw,msize=512000 "$TAG" "$MOUNT_POINT" 2>/dev/null; then
+    echo "mounted via VirtFS (9p) at $MOUNT_POINT"; return 0
   fi
 
   # 2) SPICE WebDAV
-  if hay_webdav; then
+  if has_webdav; then
     sudo systemctl start spice-webdavd 2>/dev/null || true
     for _ in 1 2 3 4 5 6 7 8 9 10; do
       curl -s -m 2 -o /dev/null "$URL" && break
       sleep 1
     done
     if ! curl -s -m 3 -o /dev/null "$URL"; then
-      echo "spice-webdavd no responde en $URL" >&2
+      echo "spice-webdavd not responding at $URL" >&2
       echo "  systemctl status spice-webdavd" >&2
       return 1
     fi
-    # davfs2 pregunta usuario y contraseña: aquí no hacen falta
-    if printf '\n\n' | sudo mount -t davfs -o rw,uid=$(id -u),gid=$(id -g) "$URL" "$PUNTO" 2>/dev/null; then
-      echo "montado por SPICE WebDAV en $PUNTO"; return 0
+    # davfs2 asks for username and password: not needed here
+    if printf '\n\n' | sudo mount -t davfs -o rw,uid=$(id -u),gid=$(id -g) "$URL" "$MOUNT_POINT" 2>/dev/null; then
+      echo "mounted via SPICE WebDAV at $MOUNT_POINT"; return 0
     fi
-    echo "davfs2 no pudo montar $URL" >&2
+    echo "davfs2 couldn't mount $URL" >&2
     return 1
   fi
 
-  echo "no encuentro ninguna carpeta compartida." >&2
-  echo "En UTM: Ajustes de la VM → Compartir → elige una ruta (VirtFS o SPICE WebDAV)," >&2
-  echo "y apaga y enciende la VM." >&2
+  echo "can't find any shared folder." >&2
+  echo "In UTM: VM Settings → Sharing → pick a mode (VirtFS or SPICE WebDAV)," >&2
+  echo "then power the VM off and back on." >&2
   return 1
 }
 
 case "${1:-}" in
-  --umount|-u) sudo umount "$PUNTO" && echo "desmontado" ;;
-  --status|-s) estado ;;
+  --umount|-u) sudo umount "$MOUNT_POINT" && echo "unmounted" ;;
+  --status|-s) status ;;
   -h|--help)   sed -n '3,14p' "$0" | sed 's/^#\{0,2\} \{0,1\}//' ;;
-  "")          montar ;;
-  *)           echo "opción desconocida: $1" >&2; exit 1 ;;
+  "")          mount_ ;;
+  *)           echo "unknown option: $1" >&2; exit 1 ;;
 esac
